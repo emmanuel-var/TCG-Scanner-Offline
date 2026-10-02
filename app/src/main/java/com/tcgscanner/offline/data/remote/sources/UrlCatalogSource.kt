@@ -46,8 +46,11 @@ class UrlCatalogSource(
     override val label: String get() = host ?: id.label
 
     override suspend fun sync(game: GameDef, sink: CatalogSink, progress: (SyncProgress) -> Unit) {
+        val custom = if (backup) "" else overrideFor(game.id)
+        // Magic's built-in default is read by the dedicated ScryfallSource, never by the format-detecting reader.
+        if (!backup && game.id == GameId.MTG && custom.isBlank()) throw SourceNotConfigured("Magic default is handled by ScryfallSource")
         val configured = if (backup) CatalogUrls.backup(game.id).orEmpty()
-        else overrideFor(game.id).ifBlank { CatalogUrls.default(game.id).orEmpty() }
+        else custom.ifBlank { CatalogUrls.default(game.id).orEmpty() }
         if (configured.isBlank()) throw SourceNotConfigured("No catalog URL for ${game.id}: import a file or paste a URL in Settings")
         val url = UrlNormalizer.normalize(configured)
         val parsed = url.toHttpUrlOrNull()

@@ -8,6 +8,7 @@ import com.tcgscanner.offline.data.prefs.SettingsStore
 import com.tcgscanner.offline.data.remote.Http
 import com.tcgscanner.offline.data.remote.sources.LorcastSource
 import com.tcgscanner.offline.data.remote.sources.MtgJsonSource
+import com.tcgscanner.offline.data.remote.sources.ScryfallSource
 import com.tcgscanner.offline.data.remote.sources.OptcgSource
 import com.tcgscanner.offline.data.remote.sources.TcgdexSource
 import com.tcgscanner.offline.data.remote.sources.UrlCatalogSource
@@ -52,6 +53,7 @@ class AppContainer(val app: Application) {
     private val sources = listOf(
         UrlCatalogSource(http, { game: GameId -> settings.catalogUrlOnce(game) }),
         UrlCatalogSource(http, { game: GameId -> settings.catalogUrlOnce(game) }, backup = true),
+        ScryfallSource(http, { game: GameId -> settings.catalogUrlOnce(game) }),
         MtgJsonSource(http), OptcgSource(http), LorcastSource(http), TcgdexSource(http)
     ).associateBy { it.id }
 

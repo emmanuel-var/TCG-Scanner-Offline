@@ -83,6 +83,8 @@ enum class SourceId(val label: String) {
     CATALOG_URL("Catalog URL"),
     /** Second built-in URL of a game (CatalogUrls.backups), tried when the first one fails. */
     CATALOG_URL_BACKUP("Backup catalog URL"),
+    /** Magic: Scryfall bulk data, two explicit requests (descriptor, then the cards array). */
+    SCRYFALL("Scryfall"),
     MTGJSON("MTGJSON"),
     OPTCG("OPTCG API"),
     LORCAST("Lorcast"),

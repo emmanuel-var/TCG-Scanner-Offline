@@ -55,7 +55,7 @@ La app **no pide claves de API ni usa servidores propios**. URLs por defecto (`d
 |---|---|---|
 | Pokémon | `api.pokemontcg.io/v2/cards` (paginado, 250 por página) | TCGdex |
 | Pokémon Japón | `api.pokemontcg.io/v2/cards?q=language:japanese` | TCGdex (ja) |
-| Magic | `api.scryfall.com/bulk-data/default-cards` (descriptor → `download_uri`, *streaming*) | MTGJSON |
+| Magic | `api.scryfall.com/bulk-data/default-cards`: `ScryfallSource` dedicada, sin detección de formato: GET 1 → `download_uri`, GET 2 nuevo → `JsonReader.beginArray()` en streaming | MTGJSON |
 | Yu-Gi-Oh! | `db.ygoprodeck.com/api/v7/cardinfo.php` | – |
 | Digimon | `digimoncard.io/api-public/search.php?series=Digimon Card Game` | – |
 | Lorcana | `api.lorcana-api.com/cards/all` | Lorcast |

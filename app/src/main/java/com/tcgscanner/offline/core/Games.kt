@@ -60,7 +60,7 @@ object Games {
             GameId.MTG, R.string.game_mtg, R.string.collection_mtg, 0xFF6D4C41, "M",
             listOf(CardVariant.NORMAL, CardVariant.FOIL, CardVariant.ETCHED),
             OcrScript.LATIN, NumberStyle.PLAIN,
-            listOf(SourceId.CATALOG_URL, SourceId.MTGJSON)
+            listOf(SourceId.SCRYFALL, SourceId.CATALOG_URL, SourceId.MTGJSON)
         ),
         GameDef(
             GameId.YGO, R.string.game_ygo, R.string.collection_ygo, 0xFF5E35B1, "YGO",

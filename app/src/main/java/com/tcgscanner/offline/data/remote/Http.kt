@@ -174,7 +174,7 @@ object JsonStream {
         reader.endArray()
     }
 
-    private fun readElement(reader: JsonReader): JsonElement = when (reader.peek()) {
+    internal fun readElement(reader: JsonReader): JsonElement = when (reader.peek()) {
         JsonToken.BEGIN_OBJECT -> {
             val map = LinkedHashMap<String, JsonElement>()
             reader.beginObject()
