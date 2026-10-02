@@ -6,15 +6,10 @@
 
 package com.tcgscanner.offline.ui.screens
 
-import android.content.ClipData
-import android.content.ClipDescription
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.draganddrop.dragAndDropSource
-import androidx.compose.foundation.draganddrop.dragAndDropTarget
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,19 +46,25 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf as stateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.composed
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draganddrop.DragAndDropEvent
-import androidx.compose.ui.draganddrop.DragAndDropTarget
-import androidx.compose.ui.draganddrop.DragAndDropTransferData
-import androidx.compose.ui.draganddrop.mimeTypes
-import androidx.compose.ui.draganddrop.toAndroidDragEvent
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -215,7 +216,6 @@ class DeckViewModel(private val c: AppContainer, private val deckId: Long) : Vie
 private const val ADD = "add:"
 private const val MOVE = "move:"
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DeckScreen(deckId: Long, onBack: () -> Unit) {
     val vm = appViewModel(key = "deck:$deckId") { DeckViewModel(it, deckId) }
@@ -232,7 +232,11 @@ fun DeckScreen(deckId: Long, onBack: () -> Unit) {
         )
     }) { padding ->
         val v = view
-        Column(Modifier.padding(padding).fillMaxSize()) {
+        val drag = remember(deckId) { DeckDragState { payload, zone -> handleDrop(vm, payload, zone) } }
+        var rootOffset by remember { stateOf(Offset.Zero) }
+        androidx.compose.runtime.CompositionLocalProvider(LocalDeckDrag provides drag) {
+        Box(Modifier.padding(padding).fillMaxSize().onGloballyPositioned { rootOffset = it.positionInRoot() }) {
+        Column(Modifier.fillMaxSize()) {
             if (v != null) {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Text(stringResource(R.string.deck_total, v.totalCards), style = MaterialTheme.typography.titleMedium)
@@ -247,21 +251,21 @@ fun DeckScreen(deckId: Long, onBack: () -> Unit) {
             }
 
             // ---- deck contents (drop target: main deck) -------------------------------------------------
-            val mainTarget = remember(deckId) { DropReceiver { payload -> handleDrop(vm, payload, DeckZone.MAIN) } }
-            val sideTarget = remember(deckId) { DropReceiver { payload -> handleDrop(vm, payload, DeckZone.SIDE) } }
+            val hovered = if (drag.payload != null) drag.zoneAt(drag.position) else null
 
             LazyColumn(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .dropTarget(mainTarget),
+                    .dropZone(drag, DeckZone.MAIN)
+                    .then(if (hovered == DeckZone.MAIN) Modifier.border(2.dp, MaterialTheme.colorScheme.primary) else Modifier),
                 contentPadding = PaddingValues(bottom = 8.dp)
             ) {
                 val grouped = v?.grouped.orEmpty()
                 DeckZone.entries.forEach { zone ->
                     val categories = grouped[zone].orEmpty()
                     item(key = "zone-${zone.code}") {
-                        ZoneHeader(zone, categories.values.sumOf { l -> l.sumOf { it.needed } }, if (zone == DeckZone.SIDE) Modifier.dropTarget(sideTarget) else Modifier)
+                        ZoneHeader(zone, categories.values.sumOf { l -> l.sumOf { it.needed } }, if (zone == DeckZone.SIDE) Modifier.dropZone(drag, DeckZone.SIDE).then(if (hovered == DeckZone.SIDE) Modifier.border(2.dp, MaterialTheme.colorScheme.primary) else Modifier) else Modifier)
                     }
                     categories.forEach { (cat, lines) ->
                         item(key = "cat-${zone.code}-${cat.code}") {
@@ -292,6 +296,20 @@ fun DeckScreen(deckId: Long, onBack: () -> Unit) {
                 }
             }
         }
+        // Floating chip that follows the finger while a card is being dragged.
+        drag.payload?.let {
+            val hoverLabel = drag.zoneAt(drag.position)?.let { z -> stringResource(z.labelRes) } ?: "…"
+            Surface(
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.primary,
+                shadowElevation = 6.dp,
+                modifier = Modifier.offset { IntOffset((drag.position.x - rootOffset.x).toInt() - 40, (drag.position.y - rootOffset.y).toInt() - 90) }
+            ) {
+                Text("+ $hoverLabel", Modifier.padding(horizontal = 14.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelLarge)
+            }
+        }
+        }
+        }
     }
 
     if (renaming && view != null) {
@@ -306,40 +324,61 @@ fun DeckScreen(deckId: Long, onBack: () -> Unit) {
     }
 }
 
-private fun handleDrop(vm: DeckViewModel, payload: String, zone: DeckZone): Boolean {
+private fun handleDrop(vm: DeckViewModel, payload: String, zone: DeckZone) {
     when {
         payload.startsWith(ADD) -> vm.change(payload.removePrefix(ADD), zone, 1)
         payload.startsWith(MOVE) -> {
             val parts = payload.removePrefix(MOVE).split('|')
-            if (parts.size == 2) vm.move(parts[0], DeckZone.fromCode(parts[1]), zone) else return false
+            if (parts.size == 2) vm.move(parts[0], DeckZone.fromCode(parts[1]), zone)
         }
-        else -> return false
-    }
-    return true
-}
-
-private class DropReceiver(private val onPayload: (String) -> Boolean) : DragAndDropTarget {
-    override fun onDrop(event: DragAndDropEvent): Boolean {
-        val clip = event.toAndroidDragEvent().clipData ?: return false
-        if (clip.itemCount == 0) return false
-        return onPayload(clip.getItemAt(0).text?.toString().orEmpty())
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
-private fun Modifier.dropTarget(target: DragAndDropTarget): Modifier = dragAndDropTarget(
-    shouldStartDragAndDrop = { event -> event.mimeTypes().contains(ClipDescription.MIMETYPE_TEXT_PLAIN) },
-    target = target
-)
+/**
+ * Drag and drop for the deck builder, built on plain pointer gestures (long-press, then drag) so it does not depend on
+ * the experimental Compose drag-and-drop API, whose signature changes between Compose versions. Drop zones register
+ * their on-screen bounds; the state tracks the finger in root coordinates and resolves the zone on release.
+ */
+private class DeckDragState(private val onDrop: (payload: String, zone: DeckZone) -> Unit) {
+    var payload by stateOf<String?>(null)
+    var position by stateOf(Offset.Zero)
+    val zones = HashMap<DeckZone, Rect>()
 
-@OptIn(ExperimentalFoundationApi::class)
-private fun Modifier.dragSource(payload: String, outline: Color): Modifier = dragAndDropSource(
-    drawDragDecoration = { drawRect(outline.copy(alpha = 0.5f)) }
-) {
-    detectTapGestures(onLongPress = {
-        startTransfer(DragAndDropTransferData(clipData = ClipData.newPlainText("tcg-card", payload)))
-    })
+    /** The side-board header is checked first because it sits inside the main list's bounds. */
+    fun zoneAt(point: Offset): DeckZone? = when {
+        zones[DeckZone.SIDE]?.contains(point) == true -> DeckZone.SIDE
+        zones[DeckZone.MAIN]?.contains(point) == true -> DeckZone.MAIN
+        else -> null
+    }
+
+    fun finish() {
+        val p = payload
+        val zone = zoneAt(position)
+        payload = null
+        if (p != null && zone != null) onDrop(p, zone)
+    }
+
+    fun cancel() { payload = null }
 }
+
+private val LocalDeckDrag = compositionLocalOf<DeckDragState> { error("DeckDragState not provided") }
+
+private fun Modifier.dragSource(state: DeckDragState, payload: String): Modifier = composed {
+    var origin by remember { stateOf(Offset.Zero) }
+    this
+        .onGloballyPositioned { origin = it.positionInRoot() }
+        .pointerInput(payload) {
+            detectDragGesturesAfterLongPress(
+                onDragStart = { offset -> state.payload = payload; state.position = origin + offset },
+                onDrag = { change, amount -> change.consume(); state.position += amount },
+                onDragEnd = { state.finish() },
+                onDragCancel = { state.cancel() }
+            )
+        }
+}
+
+private fun Modifier.dropZone(state: DeckDragState, zone: DeckZone): Modifier =
+    onGloballyPositioned { state.zones[zone] = it.boundsInRoot() }
 
 @Composable
 private fun ZoneHeader(zone: DeckZone, count: Int, modifier: Modifier) {
@@ -360,12 +399,12 @@ private fun ZoneHeader(zone: DeckZone, count: Int, modifier: Modifier) {
 @Composable
 private fun DeckLineRow(line: DeckLine, onPlus: () -> Unit, onMinus: () -> Unit, onMove: () -> Unit) {
     val missing = line.missing > 0
-    val outline = MaterialTheme.colorScheme.primary
+    val drag = LocalDeckDrag.current
     val warn = Semantic.loss
     Row(
         Modifier
             .fillMaxWidth()
-            .dragSource("$MOVE${line.card.id}|${line.zone.code}", outline)
+            .dragSource(drag, "$MOVE${line.card.id}|${line.zone.code}")
             .background(if (missing) warn.copy(alpha = 0.10f) else Color.Transparent)
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -393,11 +432,11 @@ private fun DeckLineRow(line: DeckLine, onPlus: () -> Unit, onMinus: () -> Unit,
 
 @Composable
 private fun SearchTile(cw: CardWithPrices, onAdd: () -> Unit) {
-    val outline = MaterialTheme.colorScheme.primary
+    val drag = LocalDeckDrag.current
     Column(
         Modifier
             .width(84.dp)
-            .dragSource("$ADD${cw.card.id}", outline)
+            .dragSource(drag, "$ADD${cw.card.id}")
             .clickable(onClick = onAdd)
             .semantics { contentDescription = "${cw.card.name}, ${cw.card.setName}" },
         horizontalAlignment = Alignment.CenterHorizontally
