@@ -17,6 +17,8 @@ data class RemoteCard(
     val number: String,
     val name: String,
     val rarity: String? = null,
+    /** Separates prints that share set + number (rarity code, alternate-art marker). Part of the stable card key. */
+    val printTag: String = "",
     /** Appended to the display name only (e.g. "Alt Art"); name matching ignores it. */
     val suffix: String? = null,
     val category: CardCategory = CardCategory.OTHER,
@@ -31,6 +33,9 @@ fun interface CatalogSink {
 }
 
 data class SyncProgress(val message: String, val fraction: Float? = null)
+
+/** Thrown by a source that has nothing configured (e.g. a game with no default URL and no override). */
+class SourceNotConfigured(message: String) : Exception(message)
 
 interface CatalogSource {
     val id: SourceId

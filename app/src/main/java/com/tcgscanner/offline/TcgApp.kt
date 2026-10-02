@@ -1,6 +1,7 @@
 package com.tcgscanner.offline
 
 import android.app.Application
+import com.tcgscanner.offline.data.remote.CatalogUrls
 import com.tcgscanner.offline.work.SyncScheduler
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
@@ -25,7 +26,10 @@ class TcgApp : Application() {
         // Initial sync: any activated game that has no catalog yet is downloaded in the background.
         container.scope.launch {
             val settings = container.settingsState.filterNotNull().first()
-            val empty = settings.activeGames.filter { container.db.cards().count(it.code) == 0 }
+            // Games with no built-in URL and no override wait for the user to import a file or paste a link.
+            val empty = settings.activeGames.filter {
+                container.db.cards().count(it.code) == 0 && (CatalogUrls.default(it) != null || settings.catalogUrls.containsKey(it))
+            }
             SyncScheduler.enqueueNow(this@TcgApp, empty, settings.wifiOnlySync, manual = false)
         }
     }

@@ -1,11 +1,19 @@
-# Optional TensorFlow Lite artwork model
+# Visual engine (TensorFlow Lite artwork embedder)
 
-The scanner always works with OCR and perceptual hashes. The learned embedding is an optional download:
+The scanner always works with OCR and perceptual hashes. The learned embedding is an optional ~5-15 MB download.
 
-1. Export an image feature extractor (e.g. MobileNetV2 without the classification head, global-average-pooled) to TFLite. Input `[1, H, W, 3]` (float32 in −1..1, or uint8); output `[1, N]`.
-2. Publish it as `card_embedder.tflite` in a public location, e.g. a GitHub release of this repository. The default URL is `ModelConfig.DEFAULT_URL`; users can override it in Settings → Visual engine.
-3. Set `ModelConfig.SHA256` to the file's lowercase SHA-256 so downloads are verified (leave empty to skip).
+**Build it** with `tools/model/` (see its README): `fetch_images.py` collects one reference image per card,
+`train_card_embedder.py` trains a MobileNetV2 embedder with camera-like augmentation, exports fp16 TFLite and reports
+retrieval top-1 / top-5 on strongly augmented queries.
 
-On the device the file lives in `Context.filesDir/card_embedder.tflite`. `ModelDownloadWorker` fetches it (resumable, `.part` file, atomic rename); `ModelRepository` exposes `StateFlow<ModelState>` which the camera screen collects. When the state becomes `Ready` the interpreter is loaded and "Identify by artwork" is enabled, with no restart. After installing the model, rebuild the artwork index (Settings → Scanner artwork index) so embeddings are stored with each card signature.
+**Publish it**: attach `card_embedder.tflite` to a GitHub release, set `ModelConfig.DEFAULT_URL` to the asset URL and
+`ModelConfig.SHA256` to `build/card_embedder.sha256` (downloads are verified when it is non-empty). Users can also paste
+another URL in Settings → Visual engine.
 
-The embedder is applied to the artwork window of the card (see `VisualSignature.artCrop`). Check the licence of any model you publish.
+**On the device** the file lives in `Context.filesDir/card_embedder.tflite`. `ModelDownloadWorker` fetches it (resumable,
+`.part` file, atomic rename); `ModelRepository` exposes `StateFlow<ModelState>` which the camera screen collects. When the
+state becomes `Ready` the interpreter is loaded and "Identify by artwork" is enabled, with no restart. After installing the
+model, rebuild the artwork index (Settings → Scanner artwork index) so embeddings are stored with each card signature.
+
+**Contract**: input `float32 [1,S,S,3]` in [-1,1]; the artwork window (x 8-92 %, y 12-58 %) of the card, squashed to S x S;
+output `float32 [1,D]`, L2-normalised. S and D are read from the model at load time.

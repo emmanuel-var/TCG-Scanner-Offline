@@ -8,8 +8,10 @@ import androidx.room.Relation
 import kotlinx.serialization.Serializable
 
 /**
- * One physical print of a card (set + number). There is deliberately NO foreign key from user data
- * to this table: refreshing the catalog (REPLACE) must never cascade-delete the user's collection.
+ * One physical print of a card. [id] is the STABLE composite key `game:set:number[:printTag]` (see CardKeys), not
+ * a network id, so collection rows and decks keep pointing at the same card when the catalog source changes.
+ * There is deliberately NO foreign key from user data to this table: purging or refreshing the catalog must
+ * never cascade-delete the user's collection.
  */
 @Entity(
     tableName = "card",
@@ -31,7 +33,9 @@ data class CardEntity(
     val rarity: String?,
     val category: String,
     val imageUrl: String?,
-    val isCustom: Boolean = false
+    val isCustom: Boolean = false,
+    /** Rarity code / alternate-art marker that distinguishes prints sharing set + number. Part of [id]. */
+    val printTag: String = ""
 )
 
 @Entity(tableName = "card_price", primaryKeys = ["cardId", "variant"], indices = [Index("cardId")])
@@ -70,7 +74,13 @@ data class CollectionItemEntity(
     val manualPriceUsd: Double?,
     val notes: String?,
     val addedAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    /** Identity snapshot of the card, so the row can be re-linked (and still shown) if its catalog row disappears. */
+    val cardName: String = "",
+    val setCode: String = "",
+    val setName: String = "",
+    val cardNumber: String = "",
+    val printTag: String = ""
 )
 
 @Entity(tableName = "deck", indices = [Index("gameId")])
@@ -90,7 +100,12 @@ data class DeckCardEntity(
     val deckId: Long,
     val cardId: String,
     val zone: String,
-    val quantity: Int
+    val quantity: Int,
+    val cardName: String = "",
+    val setCode: String = "",
+    val setName: String = "",
+    val cardNumber: String = "",
+    val printTag: String = ""
 )
 
 @Entity(tableName = "portfolio_snapshot", primaryKeys = ["gameId", "bucket"])
@@ -112,7 +127,9 @@ data class SyncStateEntity(
     val lastSyncAt: Long,
     val source: String,
     val cardCount: Int,
-    val lastError: String?
+    val lastError: String?,
+    /** The catalog URL whose data is currently in the card table; a different effective URL triggers a purge. */
+    val sourceUrl: String? = null
 )
 
 @Entity(tableName = "card_signature", indices = [Index("gameId")])

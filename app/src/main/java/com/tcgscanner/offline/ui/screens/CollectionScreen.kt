@@ -141,7 +141,8 @@ fun EntryList(entries: List<CollectionEntry>, onClick: (CollectionEntry) -> Unit
 @Composable
 fun EntryRow(e: CollectionEntry, onClick: () -> Unit) {
     val card = e.card
-    val name = card?.name ?: e.item.cardId
+    // If the card row is missing (source changed, not re-linked yet) show the snapshot saved with the item.
+    val name = card?.name ?: e.item.cardName.ifBlank { e.item.cardId }
     Row(
         Modifier
             .fillMaxWidth()
@@ -154,7 +155,8 @@ fun EntryRow(e: CollectionEntry, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                card?.let { "${it.setName} · #${it.number}" } ?: "",
+                card?.let { "${it.setName} · #${it.number}" }
+                    ?: if (e.item.setName.isNotBlank()) "${e.item.setName} · #${e.item.cardNumber}" else "",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis
             )

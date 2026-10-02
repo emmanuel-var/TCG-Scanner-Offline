@@ -45,7 +45,8 @@ class SyncCoordinator(
         job?.cancel()
     }
 
-    suspend fun syncAll(games: Collection<GameId>): List<SyncResult> {
+    /** [purge]: games whose catalog URL the user just changed; their old catalog is replaced, not merged. */
+    suspend fun syncAll(games: Collection<GameId>, purge: Set<GameId> = emptySet()): List<SyncResult> {
         if (!mutex.tryLock()) return emptyList()
         val results = ArrayList<SyncResult>()
         try {
@@ -54,7 +55,7 @@ class SyncCoordinator(
                 val def = Games[id]
                 _state.update { it.copy(currentGame = id, message = "", fraction = null) }
                 val result = try {
-                    catalog.sync(def) { p: SyncProgress -> _state.update { s -> s.copy(message = p.message, fraction = p.fraction) } }
+                    catalog.sync(def, forcePurge = id in purge) { p: SyncProgress -> _state.update { s -> s.copy(message = p.message, fraction = p.fraction) } }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {

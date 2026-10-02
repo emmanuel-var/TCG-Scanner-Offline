@@ -49,34 +49,45 @@ app/src/main/java/com/tcgscanner/offline
 
 ## Fuentes de datos (sin credenciales)
 
-La app **no pide claves de API ni usa servidores propios**. Cada juego tiene una URL de base de datos por defecto (`data/remote/CatalogUrls.kt`) y una o dos fuentes públicas de respaldo:
+La app **no pide claves de API ni usa servidores propios**. URLs por defecto (`data/remote/CatalogUrls.kt`):
 
 | Juego | URL por defecto | Respaldo |
 |---|---|---|
 | Pokémon | `api.pokemontcg.io/v2/cards` (paginado, 250 por página) | TCGdex |
-| Magic | `api.scryfall.com/bulk-data/default-cards` (descriptor → descarga masiva en *streaming*) | MTGJSON |
-| Yu-Gi-Oh! | `db.ygoprodeck.com/api/v7/cardinfo.php` | – |
-| Lorcana | `api.lorcana-api.com/cards/all` | Lorcast |
-| One Piece | `raw.githubusercontent.com/optcg-community/optcg-data/main/cards.json` | OPTCG API |
-| Digimon | `digimoncard.io/api-public/search.php?series=Digimon Card Game` | – |
 | Pokémon Japón | `api.pokemontcg.io/v2/cards?q=language:japanese` | TCGdex (ja) |
-| Fusion World | `raw.githubusercontent.com/limitless-community/dbs-fw-data/main/cards.json` | – |
-| Gundam | `raw.githubusercontent.com/bandai-tcg-community/gundam-db/main/cards.json` | – |
-| Riftbound | `raw.githubusercontent.com/riftbound-tts/mod-data/main/database.json` | – |
+| Magic | `api.scryfall.com/bulk-data/default-cards` (descriptor → `download_uri`, *streaming*) | MTGJSON |
+| Yu-Gi-Oh! | `db.ygoprodeck.com/api/v7/cardinfo.php` | – |
+| Digimon | `digimoncard.io/api-public/search.php?series=Digimon Card Game` | – |
+| Lorcana | `api.lorcana-api.com/cards/all` | Lorcast |
+| One Piece | `raw.githubusercontent.com/Coko7/vegapull-records/main/data/english/packs.json` → un `cards_<id>.json` por pack | OPTCG API |
+| Fusion World | *(sin URL por defecto)*: el parser entiende juegos de **Card Game Simulator** (`allCardsUrl` → AllCards.json + AllSets.json) | – |
+| Gundam, Riftbound | *(sin URL por defecto)* | – |
 
-**`UrlCatalogSource` detecta el formato** leyendo los primeros 16 KB (Pokémon TCG API, Scryfall, YGOPRODeck, lorcana-api, DigimonCard.io, el formato propio de `docs/CATALOG_FORMAT.md`) y, para cualquier otro JSON (volcados de la comunidad, datos de mods de Tabletop Simulator), usa un extractor genérico que busca objetos con forma de carta (nombre + número/imagen), con alias de campos (`Nickname`, `card_number`, `FaceURL`…).
+**Juegos sin fuente estable** (Gundam, Riftbound y Fusion World): no se incluye una URL inventada. Su estado inicial muestra *«Importa un catálogo JSON o pega la URL comunitaria en Ajustes para activar este juego»* (en el Hub, en el Portafolio con botones *Importar archivo* / *Abrir Ajustes*, y en el campo de URL de Ajustes). El worker no reintenta ni marca error mientras no haya fuente.
 
-**Override manual:** en *Ajustes → Bases de datos de cartas* cada juego activo tiene un campo «URL de la base de datos». Al guardar (un enlace `github.com/.../blob/...` se convierte solo a `raw.githubusercontent.com`) se encola un sync de WorkManager que actualiza Room desde ese enlace. Vacío = vuelve al valor por defecto. Solo se aceptan enlaces `https`.
+**Detección de formato** (`UrlCatalogSource`, primeros 16 KB): Pokémon TCG API, Scryfall (descriptor y array), YGOPRODeck, lorcana-api, DigimonCard.io, **vegapull-records** (índice de packs y `cards_*.json`), **Card Game Simulator** (descriptor del juego) y, para cualquier otro JSON (volcados comunitarios, datos de mods de Tabletop Simulator, el formato de `docs/CATALOG_FORMAT.md`), un extractor genérico con alias de campos.
 
-**Sincronización (WorkManager, `PriceSyncWorker`):** primera descarga al activar un juego (y en cada arranque si algún juego activo sigue sin catálogo), refresco diario periódico, «Sincronizar precios» manual y tras cambiar una URL. Las tareas se encadenan (`APPEND_OR_REPLACE`) y un `Mutex` garantiza un solo sync a la vez. Si la fuente principal falla o devuelve 0 cartas se prueban los respaldos; el catálogo anterior se conserva. Cambiar de fuente puede dejar cartas antiguas junto a las nuevas (la colección nunca se borra).
+**Override manual:** *Ajustes → Bases de datos de cartas*: URL por juego (los enlaces `github.com/.../blob/...` se convierten solos a `raw.githubusercontent.com`; solo https). Vacío = valor por defecto.
 
-> Varias de estas URLs comunitarias (One Piece, Fusion World, Gundam, Riftbound) **no pude verificarlas**: pueden no existir o tener otro esquema. Por eso existen el override, el extractor genérico y la importación de archivos locales. `pokemontcg.io` es un catálogo en inglés, así que es probable que la consulta `language:japanese` no devuelva nada y entre el respaldo TCGdex.
+> **No pude verificar ninguna de estas URLs ni los esquemas de vegapull-records / CGS** (el entorno de desarrollo no tiene acceso a esos hosts); están implementados según lo que sé de sus formatos. `pokemontcg.io` es un catálogo en inglés, así que es probable que `language:japanese` no devuelva nada y entre el respaldo TCGdex.
+
+## Duplicados, cambio de fuente y re-vinculación
+
+* **Llave estable.** `card.id` ya no es un id de red sino `game:set:número[:printTag]` (`CardKeys`), p. ej. `pokemon:base1:4`. Volver a descargar los mismos datos hace *upsert* en el sitio, no duplicados. `printTag` distingue impresiones con el mismo set+número (rarezas de Yu-Gi-Oh!, artes alternos de One Piece `_p1`); si una fuente repite una llave sin etiqueta se añade un sufijo determinista (`dup2`, `dup3`…) para que la segunda carta no pise a la primera.
+* **Purga transaccional.** Si la URL efectiva cambia respecto a la que originó los datos guardados (`sync_state.sourceUrl`), o el worker recibe `purge` tras guardar un override, `CatalogRepository` borra precios, precios graduados, firmas y cartas **de ese juego** en la misma transacción que inserta el primer lote nuevo. Si la URL nueva falla, no se borra nada.
+* **Colección intacta.** Nunca se tocan colección, mazos ni Trade Binder (y no hay claves foráneas hacia el catálogo). Las cartas personalizadas tampoco.
+* **Re-vinculación heurística.** Cada fila de colección/mazo guarda una *foto* de identidad (nombre, set, número, etiqueta). Tras cada sync (y al importar o restaurar) `CardRelinker` busca filas cuyo catálogo ya no existe y las conecta por número exacto + similitud de nombre/set (`RelinkMatcher`); si hay empate no adivina y la fila conserva su foto (se sigue mostrando por nombre).
+* **Migración Room 1→2** (`AppDatabase.MIGRATION_1_2`): añade las columnas, rellena las fotos y vacía el catálogo descargable para que se regenere con llaves estables.
 
 ## Escáner
 
 1. **ML Kit Text Recognition** (modelo incluido en el APK, offline): lee nombre y número impreso (`OP01-120`, `025/198`, `LOB-EN005`…). `CardTextParser` extrae candidatos y `ScanMatcher` los cruza en Room solo para el juego activo (número exacto + similitud de nombre con tolerancia a errores de OCR). Hacen falta 2 lecturas consistentes antes de fijar.
 2. **Resolución de variantes**: *bottom sheet* con versión, estado/slab, cantidad y precio manual opcional, más «otras ediciones de esta carta».
 3. **Cartas de arte completo y motor visual**: el escáner abre con OCR inmediatamente, sin pantallas de carga. Si `filesDir/card_embedder.tflite` no existe, una tarjeta translúcida sobre la cámara ofrece descargarlo (~15 MB) con un `OneTimeWorkRequest` (`ModelDownloadWorker`: reanudable, escribe a `.part` y valida tamaño/SHA-256 antes de renombrar). `ModelRepository.state` (`StateFlow`) se deriva del `WorkInfo` y del archivo: `Missing → Downloading(progreso) → Ready`. Al llegar a `Ready` se carga el intérprete, la tarjeta desaparece y el botón «Identificar por ilustración» se habilita sin reiniciar nada. Las firmas de ilustraciones se generan desde Ajustes (opcional). Ver `docs/SCANNER_MODEL.md`.
+
+## Entrenar el modelo visual (Python)
+
+`tools/model/`: `fetch_images.py` (descarga imágenes de referencia desde cualquier catálogo JSON) y `train_card_embedder.py` (MobileNetV2 + embedding de 128 dimensiones con margen coseno, aumentos tipo cámara, exporta `card_embedder.tflite` en fp16 y evalúa recuperación top-1/top-5). Ver `tools/model/README.md`. El contrato de entrada (recorte de arte, rango [-1, 1]) debe coincidir con `TfliteEmbedder`/`VisualSignature`.
 
 ## Compilar
 
@@ -106,8 +117,9 @@ Ver `docs/PLAY_STORE_CHECKLIST.md` y `docs/PRIVACY_POLICY.md`. Resumen: `targetS
 El proyecto se escribió en un entorno sin Android SDK ni acceso a Google Maven, por lo que **el APK completo no pudo compilarse allí**. Lo que sí se verificó con la JVM:
 
 * compilación de `core`, `data/remote` (todas las fuentes), entidades, valoración, parser OCR y modelos de intercambio;
-* 33 pruebas unitarias en `app/src/test` (texto, parser OCR, valoración, CSV, veredicto de intercambio, adaptadores y detección de formato, estados del modelo);
-* pruebas adicionales de `UrlCatalogSource` y las fuentes de respaldo contra respuestas simuladas (paginación, descriptor de Scryfall, override con enlace *blob*, enlace caído).
+* 46 pruebas unitarias en `app/src/test` (texto, parser OCR, valoración, CSV, veredicto de intercambio, adaptadores y detección de formato incl. vegapull y CGS, llaves estables, re-vinculación, estados del modelo);
+* pruebas adicionales de `UrlCatalogSource` contra respuestas simuladas (paginación, descriptor de Scryfall, índice vegapull, descriptor CGS, override con enlace *blob*, juegos sin URL, enlace caído);
+* el script de entrenamiento se ejecutó de punta a punta con TensorFlow 2.21 sobre cartas sintéticas (sin pesos ImageNet): exporta un `.tflite` de ~4.6 MB y evalúa. **No lo entrené con cartas reales**, así que no hay cifras de precisión reales todavía.
 
 Antes de publicar: compila en Android Studio, corrige cualquier error menor de API, y prueba en dispositivo real el escáner, el arrastrar y soltar, Nearby (dos teléfonos con Google Play Services) y las fuentes con red real.
 

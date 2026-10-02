@@ -115,8 +115,12 @@ class SettingsViewModel(private val c: AppContainer) : ViewModel() {
         val clean = raw.trim()
         if (clean.isNotEmpty() && !UrlNormalizer.isValid(clean)) return R.string.catalog_url_invalid
         viewModelScope.launch {
-            c.settings.setCatalogUrl(game, UrlNormalizer.normalize(clean))
-            SyncScheduler.enqueueNow(c.app, listOf(game), wifiOnly = false, manual = true)
+            val before = UrlNormalizer.normalize(c.settings.catalogUrlOnce(game))
+            val after = UrlNormalizer.normalize(clean)
+            c.settings.setCatalogUrl(game, after)
+            // A real source change: the worker purges this game's catalog rows before inserting the new data
+            // (collection, decks and trade binder are untouched and re-linked afterwards).
+            SyncScheduler.enqueueNow(c.app, listOf(game), wifiOnly = false, manual = true, purge = if (before != after) listOf(game) else emptyList())
             _messages.emit(R.string.catalog_url_saved)
         }
         return null
@@ -254,7 +258,7 @@ fun SettingsScreen(nav: NavController, onBack: () -> Unit) {
                             else stringResource(R.string.sync_state_line, relativeTime(st.lastSyncAt), st.source, st.cardCount),
                             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        val failure = sync.results[id]?.takeIf { !it.success }
+                        val failure = sync.results[id]?.takeIf { !it.success && it.error != com.tcgscanner.offline.data.repo.SyncResult.NO_SOURCE }
                         if (failure != null) {
                             Text(
                                 stringResource(R.string.sync_failed, failure.error.orEmpty()),
@@ -429,7 +433,7 @@ private fun SwitchRow(title: String, hint: String, checked: Boolean, onChange: (
 private fun CatalogUrlRow(
     game: GameDef,
     saved: String,
-    default: String,
+    default: String?,
     busy: Boolean,
     onSave: (String) -> Int?,
     onSyncNow: () -> Unit
@@ -444,10 +448,13 @@ private fun CatalogUrlRow(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             label = { Text(stringResource(R.string.catalog_url_label)) },
-            placeholder = { Text(default) },
+            placeholder = { Text(default ?: "https://…") },
             isError = error != null,
             supportingText = {
-                Text(error?.let { stringResource(it) } ?: stringResource(R.string.catalog_url_default, default))
+                Text(
+                    error?.let { stringResource(it) }
+                        ?: if (default != null) stringResource(R.string.catalog_url_default, default) else stringResource(R.string.catalog_url_needed)
+                )
             }
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

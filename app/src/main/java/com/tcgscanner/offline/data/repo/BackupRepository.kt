@@ -26,7 +26,7 @@ data class BackupFile(
 )
 
 /** Local JSON backup / restore of everything the user created (no cloud involved). */
-class BackupRepository(private val db: AppDatabase) {
+class BackupRepository(private val db: AppDatabase, private val relinker: CardRelinker) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     suspend fun createBackup(): String = withContext(Dispatchers.IO) {
@@ -60,6 +60,8 @@ class BackupRepository(private val db: AppDatabase) {
             db.decks().restoreDeckCards(file.deckCards)
             db.portfolio().restore(file.snapshots)
         }
+        // A backup made against another catalog source: re-attach rows to whatever catalog is installed now.
+        com.tcgscanner.offline.core.GameId.entries.forEach { g -> runCatching { relinker.relink(g) } }
     }
 
     /** "Erase all my data": user data, catalog and signatures. */

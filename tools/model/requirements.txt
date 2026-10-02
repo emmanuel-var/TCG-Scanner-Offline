@@ -1,0 +1,5 @@
+# Python 3.10 - 3.12
+tensorflow>=2.16        # CPU works; a GPU is strongly recommended for the full training run
+numpy>=1.26
+pillow>=10.0
+requests>=2.31

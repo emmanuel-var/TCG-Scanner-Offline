@@ -30,6 +30,7 @@ class CollectionRepository(private val db: AppDatabase, private val portfolio: P
             val graded = spec.company.isGraded
             val condition = if (graded) CardCondition.NM else spec.condition
             val grade = if (graded) spec.gradeX10 else 0
+            val card = db.cards().get(spec.cardId)
             val existing = dao.findMatch(game.code, spec.cardId, spec.variant.code, condition.code, spec.company.code, grade)
             val qty = spec.quantity.coerceAtLeast(1)
             val trade = if (spec.toBinder) qty else 0
@@ -39,7 +40,12 @@ class CollectionRepository(private val db: AppDatabase, private val portfolio: P
                         quantity = existing.quantity + qty,
                         tradeQuantity = (existing.tradeQuantity + trade).coerceAtMost(existing.quantity + qty),
                         manualPriceUsd = spec.manualPriceUsd ?: existing.manualPriceUsd,
-                        updatedAt = now
+                        updatedAt = now,
+                        cardName = existing.cardName.ifBlank { card?.name.orEmpty() },
+                        setCode = existing.setCode.ifBlank { card?.setCode.orEmpty() },
+                        setName = existing.setName.ifBlank { card?.setName.orEmpty() },
+                        cardNumber = existing.cardNumber.ifBlank { card?.number.orEmpty() },
+                        printTag = existing.printTag.ifBlank { card?.printTag.orEmpty() }
                     )
                 )
             } else {
@@ -48,7 +54,10 @@ class CollectionRepository(private val db: AppDatabase, private val portfolio: P
                         gameId = game.code, cardId = spec.cardId, variant = spec.variant.code,
                         condition = condition.code, gradeCompany = spec.company.code, gradeX10 = grade,
                         quantity = qty, tradeQuantity = trade, manualPriceUsd = spec.manualPriceUsd,
-                        notes = null, addedAt = now, updatedAt = now
+                        notes = null, addedAt = now, updatedAt = now,
+                        // Identity snapshot: lets the row be re-linked if the catalog source changes.
+                        cardName = card?.name.orEmpty(), setCode = card?.setCode.orEmpty(), setName = card?.setName.orEmpty(),
+                        cardNumber = card?.number.orEmpty(), printTag = card?.printTag.orEmpty()
                     )
                 )
             }

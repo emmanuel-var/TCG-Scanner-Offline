@@ -1,6 +1,6 @@
 # Custom catalog format
 
-Any game can be fed from a JSON file you import in **Settings** or from an `https://` URL set in **Settings → Card databases**. The app also understands the native formats of Pokémon TCG API, Scryfall, YGOPRODeck, lorcana-api and DigimonCard.io, and falls back to a tolerant extractor for other card-shaped JSON (including Tabletop Simulator mod data). The format below is the explicit one, the only one that can carry graded prices.
+Any game can be fed from a JSON file you import in **Settings** or from an `https://` URL set in **Settings → Card databases**. The app also understands the native formats of Pokémon TCG API, Scryfall, YGOPRODeck, lorcana-api, DigimonCard.io, vegapull-records (One Piece) and Card Game Simulator game files, and falls back to a tolerant extractor for other card-shaped JSON (including Tabletop Simulator mod data). The format below is the explicit one, the only one that can carry graded prices.
 
 ```json
 {
@@ -29,3 +29,7 @@ Any game can be fed from a JSON file you import in **Settings** or from an `http
 * `prices` keys: `normal`, `holo`, `reverse_holo`, `1st_edition`, `1st_ed_holo`, `foil`, `etched`, `parallel`, `promo`, `limited`.
 * `graded.company`: `PSA`, `BGS`, `CGC`, `SGC` or `ANY`; `grade` accepts halves (`9.5`).
 * `number` should be what is printed on the card (`OP01-120`, `025`) so the scanner can match it.
+
+## Identity
+
+Cards are keyed internally by `game:setCode:number[:printTag]` (see `CardKeys`). Keep `setCode` and `number` stable across versions of your file so users' collections stay attached; use distinct `id`s for alternate prints that share a number (the app adds a `dup2` suffix if you do not).

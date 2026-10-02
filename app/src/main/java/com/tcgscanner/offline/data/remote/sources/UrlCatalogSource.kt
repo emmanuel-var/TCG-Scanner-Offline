@@ -12,6 +12,7 @@ import com.tcgscanner.offline.data.remote.CatalogUrls
 import com.tcgscanner.offline.data.remote.Http
 import com.tcgscanner.offline.data.remote.JsonStream
 import com.tcgscanner.offline.data.remote.RemoteCard
+import com.tcgscanner.offline.data.remote.SourceNotConfigured
 import com.tcgscanner.offline.data.remote.SyncProgress
 import com.tcgscanner.offline.data.remote.UrlNormalizer
 import com.tcgscanner.offline.data.remote.a
@@ -19,6 +20,7 @@ import com.tcgscanner.offline.data.remote.int
 import com.tcgscanner.offline.data.remote.obj
 import com.tcgscanner.offline.data.remote.s
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -41,7 +43,8 @@ class UrlCatalogSource(
     override val label: String get() = host ?: id.label
 
     override suspend fun sync(game: GameDef, sink: CatalogSink, progress: (SyncProgress) -> Unit) {
-        val configured = overrideFor(game.id).ifBlank { CatalogUrls.default(game.id) }
+        val configured = overrideFor(game.id).ifBlank { CatalogUrls.default(game.id).orEmpty() }
+        if (configured.isBlank()) throw SourceNotConfigured("No catalog URL for ${game.id}: import a file or paste a URL in Settings")
         val url = UrlNormalizer.normalize(configured)
         val parsed = url.toHttpUrlOrNull()
         require(parsed != null && parsed.isHttps) { "Invalid catalog URL (https required): $url" }
@@ -91,6 +94,19 @@ class UrlCatalogSource(
                     JsonStream.forEachArrayElement(body, streamKey) { o -> CatalogAdapters.digimon(o)?.let { out.add(it) } }
                     null
                 }
+                CatalogFormat.VEGAPULL_CARDS -> {
+                    JsonStream.forEachArrayElement(body, streamKey) { o -> CatalogAdapters.vegapullCard(o)?.let { out.add(it) } }
+                    null
+                }
+                CatalogFormat.VEGAPULL_PACKS -> {
+                    val packs = CatalogAdapters.vegapullPacks(Json.parseToJsonElement(body.string()))
+                    vegapullPacks(url, packs, out, progress)
+                    null
+                }
+                CatalogFormat.CGS_GAME -> {
+                    cgsGame(url, Json.parseToJsonElement(body.string()).obj() ?: throw IOException("Bad CGS descriptor"), out, progress)
+                    null
+                }
                 CatalogFormat.GENERIC -> {
                     val root = Json.parseToJsonElement(body.string())
                     CatalogAdapters.findCardObjects(root).forEach { o -> CatalogAdapters.generic(o)?.let { out.add(it) } }
@@ -98,6 +114,42 @@ class UrlCatalogSource(
                 }
             }
         }
+
+    /** One Pack index -> one request per `cards_<packId>.json` next to it. A broken pack is skipped, not fatal. */
+    private suspend fun vegapullPacks(indexUrl: String, packs: List<CatalogAdapters.VegapullPack>, out: BatchedSink, progress: (SyncProgress) -> Unit) {
+        val base = indexUrl.toHttpUrlOrNull() ?: throw IOException("Bad URL")
+        var failures = 0
+        packs.forEachIndexed { i, pack ->
+            val cardsUrl = base.resolve("cards_${pack.id}.json")?.toString() ?: return@forEachIndexed
+            progress(SyncProgress("${base.host} · ${pack.title}", (i + 1f) / packs.size))
+            try {
+                val root = http.getJson(cardsUrl)
+                val array = root as? JsonArray ?: (root as? JsonObject)?.values?.firstOrNull { it is JsonArray } as? JsonArray
+                array?.forEach { el -> el.obj()?.let { CatalogAdapters.vegapullCard(it, pack) }?.let { out.add(it) } }
+            } catch (e: IOException) {
+                failures++
+            }
+        }
+        if (out.total == 0 && failures > 0) throw IOException("Could not read any pack file next to $indexUrl")
+    }
+
+    /** Card Game Simulator: descriptor -> AllSets.json (names) + AllCards.json (cards). */
+    private suspend fun cgsGame(descriptorUrl: String, root: JsonObject, out: BatchedSink, progress: (SyncProgress) -> Unit) {
+        val d = CatalogAdapters.cgsDescriptor(root) ?: throw IOException("CGS descriptor without allCardsUrl")
+        val base = descriptorUrl.toHttpUrlOrNull() ?: throw IOException("Bad URL")
+        fun resolve(link: String): String = base.resolve(link)?.toString() ?: link
+        val setNames = d.allSetsUrl?.let { link ->
+            try { CatalogAdapters.cgsSetNames(http.getJson(resolve(link)), d) } catch (e: IOException) { emptyMap() }
+        }.orEmpty()
+        progress(SyncProgress("${base.host} · Card Game Simulator cards"))
+        val cardsRoot = http.getJson(resolve(d.allCardsUrl))
+        val array = when {
+            cardsRoot is JsonArray -> cardsRoot
+            !d.allCardsWrapper.isNullOrBlank() -> (cardsRoot as? JsonObject)?.get(d.allCardsWrapper) as? JsonArray
+            else -> (cardsRoot as? JsonObject)?.values?.firstOrNull { it is JsonArray } as? JsonArray
+        } ?: throw IOException("CGS cards file has no card array")
+        array.forEach { el -> el.obj()?.let { CatalogAdapters.cgsCard(it, d, setNames) }?.let { out.add(it) } }
+    }
 
     private suspend fun tick(out: BatchedSink, progress: (SyncProgress) -> Unit) {
         if (out.total % 5000 == 0) progress(SyncProgress("${host.orEmpty()} · ${out.total} cards"))

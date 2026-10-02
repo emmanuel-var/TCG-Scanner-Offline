@@ -14,6 +14,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.tcgscanner.offline.TcgApp
 import com.tcgscanner.offline.core.GameId
+import com.tcgscanner.offline.data.repo.SyncResult
 import java.util.concurrent.TimeUnit
 
 /**
@@ -26,13 +27,19 @@ class PriceSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
         val requested = inputData.getStringArray(KEY_GAMES)?.mapNotNull { GameId.fromCode(it) }?.toSet().orEmpty()
         val games = if (requested.isNotEmpty()) requested else container.settings.current().activeGames
         if (games.isEmpty()) return Result.success()
-        val results = container.sync.syncAll(games)
-        val allFailed = results.isNotEmpty() && results.none { it.success }
+        val purge = inputData.getStringArray(KEY_PURGE)?.mapNotNull { GameId.fromCode(it) }?.toSet().orEmpty()
+        val results = container.sync.syncAll(games, purge)
+        // A game with no source configured is not a failure and must not be retried.
+        val attempted = results.filter { it.error != SyncResult.NO_SOURCE }
+        val allFailed = attempted.isNotEmpty() && attempted.none { it.success }
         return if (allFailed && runAttemptCount < 3) Result.retry() else Result.success()
     }
 
     companion object {
         const val KEY_GAMES = "games"
+
+        /** Games whose catalog URL was just changed by the user: purge their catalog rows before inserting new data. */
+        const val KEY_PURGE = "purge"
     }
 }
 
@@ -59,11 +66,16 @@ object SyncScheduler {
      * games, or changing a URL while a sync runs, never drops work and never runs two syncs at once.
      * [manual] syncs ignore the Wi-Fi-only preference: the user explicitly asked for it.
      */
-    fun enqueueNow(context: Context, games: Collection<GameId>, wifiOnly: Boolean, manual: Boolean) {
+    fun enqueueNow(context: Context, games: Collection<GameId>, wifiOnly: Boolean, manual: Boolean, purge: Collection<GameId> = emptyList()) {
         if (games.isEmpty()) return
         val request = OneTimeWorkRequestBuilder<PriceSyncWorker>()
             .setConstraints(constraints(wifiOnly && !manual))
-            .setInputData(Data.Builder().putStringArray(PriceSyncWorker.KEY_GAMES, games.map { it.code }.toTypedArray()).build())
+            .setInputData(
+                Data.Builder()
+                    .putStringArray(PriceSyncWorker.KEY_GAMES, games.map { it.code }.toTypedArray())
+                    .putStringArray(PriceSyncWorker.KEY_PURGE, purge.map { it.code }.toTypedArray())
+                    .build()
+            )
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(NOW, ExistingWorkPolicy.APPEND_OR_REPLACE, request)

@@ -12,6 +12,7 @@ import com.tcgscanner.offline.data.remote.sources.OptcgSource
 import com.tcgscanner.offline.data.remote.sources.TcgdexSource
 import com.tcgscanner.offline.data.remote.sources.UrlCatalogSource
 import com.tcgscanner.offline.data.repo.BackupRepository
+import com.tcgscanner.offline.data.repo.CardRelinker
 import com.tcgscanner.offline.data.repo.CatalogRepository
 import com.tcgscanner.offline.data.repo.CollectionRepository
 import com.tcgscanner.offline.data.repo.CsvExporter
@@ -50,13 +51,14 @@ class AppContainer(val app: Application) {
         MtgJsonSource(http), OptcgSource(http), LorcastSource(http), TcgdexSource(http)
     ).associateBy { it.id }
 
-    val catalog = CatalogRepository(db, settings, sources)
+    val relinker = CardRelinker(db)
+    val catalog = CatalogRepository(db, settings, sources, relinker) { game -> visualMatcher.invalidate(game) }
     val portfolio = PortfolioRepository(db)
     val collection = CollectionRepository(db, portfolio)
     val decks = DeckRepository(db)
     val sync = SyncCoordinator(scope, catalog, portfolio)
     val csv = CsvExporter(db)
-    val backup = BackupRepository(db)
+    val backup = BackupRepository(db, relinker)
 
     val embedder by lazy { TfliteEmbedder(File(app.filesDir, ModelConfig.FILE_NAME)) }
     val models by lazy { ModelRepository(app, scope, settings, embedder) }

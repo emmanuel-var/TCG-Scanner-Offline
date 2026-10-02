@@ -81,8 +81,21 @@ class DeckRepository(private val db: AppDatabase) {
     suspend fun changeQuantity(deckId: Long, cardId: String, zone: DeckZone, delta: Int) {
         val existing = dao.getDeckCard(deckId, cardId, zone.code)
         val next = (existing?.quantity ?: 0) + delta
-        if (next <= 0) dao.removeDeckCard(deckId, cardId, zone.code)
-        else dao.putDeckCard(DeckCardEntity(deckId, cardId, zone.code, next))
+        if (next <= 0) {
+            dao.removeDeckCard(deckId, cardId, zone.code)
+        } else {
+            val card = db.cards().get(cardId)
+            dao.putDeckCard(
+                DeckCardEntity(
+                    deckId, cardId, zone.code, next,
+                    cardName = existing?.cardName?.ifBlank { card?.name.orEmpty() } ?: card?.name.orEmpty(),
+                    setCode = existing?.setCode?.ifBlank { card?.setCode.orEmpty() } ?: card?.setCode.orEmpty(),
+                    setName = existing?.setName?.ifBlank { card?.setName.orEmpty() } ?: card?.setName.orEmpty(),
+                    cardNumber = existing?.cardNumber?.ifBlank { card?.number.orEmpty() } ?: card?.number.orEmpty(),
+                    printTag = existing?.printTag?.ifBlank { card?.printTag.orEmpty() } ?: card?.printTag.orEmpty()
+                )
+            )
+        }
         touch(deckId)
     }
 
@@ -91,7 +104,7 @@ class DeckRepository(private val db: AppDatabase) {
         val src = dao.getDeckCard(deckId, cardId, from.code) ?: return
         dao.removeDeckCard(deckId, cardId, from.code)
         val dst = dao.getDeckCard(deckId, cardId, to.code)
-        dao.putDeckCard(DeckCardEntity(deckId, cardId, to.code, (dst?.quantity ?: 0) + src.quantity))
+        dao.putDeckCard((dst ?: src).copy(zone = to.code, quantity = (dst?.quantity ?: 0) + src.quantity))
         touch(deckId)
     }
 

@@ -249,6 +249,11 @@
     <string name="section_visual_engine">Motor visual</string>
     <string name="visual_engine_explainer">Modelo opcional de TensorFlow Lite (unos %1$d MB) que mejora el reconocimiento de cartas Full Art. El escaneo con reconocimiento de texto funciona sin él.</string>
     <string name="model_url_label">URL del modelo (https)</string>
+    <string name="needs_source_title">Activa este juego</string>
+    <string name="needs_source_message">Importa un catálogo JSON o pega la URL comunitaria en Ajustes para activar este juego.</string>
+    <string name="needs_source_short">Importa un catálogo o pega una URL para activar</string>
+    <string name="open_settings">Abrir Ajustes</string>
+    <string name="catalog_url_needed">Este juego aún no tiene fuente integrada. Pega el enlace .json de la comunidad (o un archivo de juego de Card Game Simulator) o importa un archivo.</string>
     <plurals name="cards_count">
         <item quantity="one">%d carta</item>
         <item quantity="other">%d cartas</item>

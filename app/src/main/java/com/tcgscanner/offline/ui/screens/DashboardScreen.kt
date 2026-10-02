@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import androidx.navigation.NavController
 import com.tcgscanner.offline.AppContainer
 import com.tcgscanner.offline.R
@@ -51,6 +52,7 @@ import com.tcgscanner.offline.core.GameDef
 import com.tcgscanner.offline.core.GameId
 import com.tcgscanner.offline.core.Games
 import com.tcgscanner.offline.data.db.PortfolioSnapshotEntity
+import com.tcgscanner.offline.data.remote.CatalogUrls
 import com.tcgscanner.offline.data.repo.PortfolioSummary
 import com.tcgscanner.offline.data.repo.SyncUiState
 import com.tcgscanner.offline.ui.appViewModel
@@ -78,7 +80,9 @@ data class DashboardState(
     val summary: PortfolioSummary = PortfolioSummary(),
     val snapshots: List<PortfolioSnapshotEntity> = emptyList(),
     val lastSync: Long? = null,
-    val catalogCards: Int = 0
+    val catalogCards: Int = 0,
+    /** No built-in URL for this game, no pasted URL and no imported catalog yet. */
+    val needsSource: Boolean = false
 )
 
 class DashboardViewModel(private val c: AppContainer) : ViewModel() {
@@ -86,11 +90,30 @@ class DashboardViewModel(private val c: AppContainer) : ViewModel() {
     val state: StateFlow<DashboardState> = c.currentGameFlow().flatMapLatest { id ->
         combine(
             c.portfolio.observeSummary(id), c.portfolio.observeSnapshots(id),
-            c.catalog.observeLastSync(id), c.catalog.observeCount(id)
-        ) { summary, snaps, last, count -> DashboardState(Games[id], summary, snaps, last, count) }
+            c.catalog.observeLastSync(id), c.catalog.observeCount(id), c.settingsState
+        ) { summary, snaps, last, count, settings ->
+            val needs = count == 0 && CatalogUrls.requiresUserSource(id) && settings?.catalogUrls?.containsKey(id) != true
+            DashboardState(Games[id], summary, snaps, last, count, needs)
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
 
     val sync: StateFlow<SyncUiState> = c.sync.state
+
+    private val _messages = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 2)
+    val messages: kotlinx.coroutines.flow.SharedFlow<String> = _messages
+
+    /** "Import a catalog JSON" from the activation prompt; works offline and accepts any card-shaped JSON. */
+    fun importCatalog(context: android.content.Context, uri: android.net.Uri, game: GameDef) {
+        viewModelScope.launch {
+            val n = runCatching {
+                val text = context.contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+                c.catalog.importCatalogJson(game, text)
+            }
+            _messages.emit(
+                if (n.getOrDefault(0) > 0) context.getString(R.string.import_done, n.getOrDefault(0)) else context.getString(R.string.import_failed)
+            )
+        }
+    }
 
     fun syncNow(game: GameId) = SyncScheduler.enqueueNow(c.app, listOf(game), wifiOnly = false, manual = true)
 }
@@ -107,8 +130,16 @@ fun DashboardScreen(nav: NavController) {
     val game = state.game
     var range by rememberSaveable { mutableStateOf(Range.MONTH) }
     var scrubbed by remember { mutableStateOf<ChartPoint?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val snackbar = remember { androidx.compose.material3.SnackbarHostState() }
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.messages.collect { snackbar.showSnackbar(it) } }
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null && game != null) vm.importCatalog(context, uri, game) }
 
-    GameScaffold(nav, title = game?.let { stringResource(it.collectionNameRes) } ?: stringResource(R.string.app_name)) { padding ->
+    GameScaffold(
+        nav, title = game?.let { stringResource(it.collectionNameRes) } ?: stringResource(R.string.app_name), snackbarHost = snackbar
+    ) { padding ->
         if (game == null) return@GameScaffold
         // Chart series: stored snapshots plus the live value, so the line always ends "now".
         val now = System.currentTimeMillis()
@@ -188,7 +219,14 @@ fun DashboardScreen(nav: NavController) {
                 )
             }
 
-            SyncCard(state.lastSync, state.catalogCards, sync, game) { vm.syncNow(game.id) }
+            if (state.needsSource) {
+                NeedsSourceCard(
+                    onImport = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
+                    onSettings = { nav.navigate(Routes.SETTINGS) }
+                )
+            } else {
+                SyncCard(state.lastSync, state.catalogCards, sync, game) { vm.syncNow(game.id) }
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 FilledTonalButton(onClick = { nav.navigate(Routes.DECKS) }, modifier = Modifier.weight(1f)) {
@@ -243,7 +281,7 @@ private fun SyncCard(lastSync: Long?, catalogCards: Int, sync: SyncUiState, game
                 if (sync.message.isNotBlank()) Text(sync.message, style = MaterialTheme.typography.bodyMedium)
             }
             val result = sync.results[game.id]
-            if (!sync.running && result != null && !result.success) {
+            if (!sync.running && result != null && !result.success && result.error != com.tcgscanner.offline.data.repo.SyncResult.NO_SOURCE) {
                 Text(
                     stringResource(R.string.sync_failed, result.error.orEmpty()),
                     color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium
@@ -251,6 +289,21 @@ private fun SyncCard(lastSync: Long?, catalogCards: Int, sync: SyncUiState, game
             }
             if (catalogCards == 0 && !sync.running) {
                 Button(onClick = onSync) { Text(stringResource(R.string.download_catalog)) }
+            }
+        }
+    }
+}
+
+/** Initial state of games that have no stable public catalog: invite the user to provide one. */
+@Composable
+private fun NeedsSourceCard(onImport: () -> Unit, onSettings: () -> Unit) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.needs_source_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.needs_source_message), style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onImport) { Text(stringResource(R.string.import_catalog_file)) }
+                androidx.compose.material3.OutlinedButton(onClick = onSettings) { Text(stringResource(R.string.open_settings)) }
             }
         }
     }

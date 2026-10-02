@@ -77,6 +77,12 @@ interface CardDao {
     @Query("DELETE FROM card WHERE gameId = :game AND isCustom = 0")
     suspend fun deleteCatalog(game: String)
 
+    @Query("DELETE FROM card_signature WHERE cardId IN (SELECT id FROM card WHERE gameId = :game AND isCustom = 0)")
+    suspend fun deleteCatalogSignatures(game: String)
+
+    @Query("SELECT id FROM card WHERE gameId = :game")
+    suspend fun allIds(game: String): List<String>
+
     @Query("DELETE FROM card_price WHERE cardId IN (SELECT id FROM card WHERE gameId = :game AND isCustom = 0)")
     suspend fun deleteCatalogPrices(game: String)
 
@@ -179,6 +185,22 @@ interface CollectionDao {
     @Query("SELECT DISTINCT gameId FROM collection_item")
     suspend fun gamesWithItems(): List<String>
 
+    /** Fills the identity snapshot of rows that were created before snapshots existed and still have a card. */
+    @Query(
+        "UPDATE collection_item SET " +
+            "cardName = (SELECT name FROM card WHERE card.id = collection_item.cardId), " +
+            "setCode = (SELECT setCode FROM card WHERE card.id = collection_item.cardId), " +
+            "setName = (SELECT setName FROM card WHERE card.id = collection_item.cardId), " +
+            "cardNumber = (SELECT number FROM card WHERE card.id = collection_item.cardId), " +
+            "printTag = (SELECT printTag FROM card WHERE card.id = collection_item.cardId) " +
+            "WHERE gameId = :game AND cardName = '' AND cardId IN (SELECT id FROM card WHERE gameId = :game)"
+    )
+    suspend fun backfillSnapshots(game: String)
+
+    /** Items whose card no longer exists in the catalog (e.g. right after a source change). */
+    @Query("SELECT * FROM collection_item WHERE gameId = :game AND cardId NOT IN (SELECT id FROM card WHERE gameId = :game)")
+    suspend fun orphans(game: String): List<CollectionItemEntity>
+
     @Query("DELETE FROM collection_item WHERE gameId = :game")
     suspend fun deleteGame(game: String)
 
@@ -227,6 +249,24 @@ interface DeckDao {
 
     @Query("DELETE FROM deck_card WHERE deckId = :deckId AND cardId = :cardId AND zone = :zone")
     suspend fun removeDeckCard(deckId: Long, cardId: String, zone: String)
+
+    @Query(
+        "SELECT dc.* FROM deck_card dc JOIN deck d ON d.id = dc.deckId WHERE d.gameId = :game " +
+            "AND dc.cardId NOT IN (SELECT id FROM card WHERE gameId = :game)"
+    )
+    suspend fun orphanDeckCards(game: String): List<DeckCardEntity>
+
+    @Query(
+        "UPDATE deck_card SET " +
+            "cardName = (SELECT name FROM card WHERE card.id = deck_card.cardId), " +
+            "setCode = (SELECT setCode FROM card WHERE card.id = deck_card.cardId), " +
+            "setName = (SELECT setName FROM card WHERE card.id = deck_card.cardId), " +
+            "cardNumber = (SELECT number FROM card WHERE card.id = deck_card.cardId), " +
+            "printTag = (SELECT printTag FROM card WHERE card.id = deck_card.cardId) " +
+            "WHERE cardName = '' AND deckId IN (SELECT id FROM deck WHERE gameId = :game) " +
+            "AND cardId IN (SELECT id FROM card WHERE gameId = :game)"
+    )
+    suspend fun backfillSnapshots(game: String)
 
     @Query("SELECT * FROM deck")
     suspend fun allDecks(): List<DeckEntity>

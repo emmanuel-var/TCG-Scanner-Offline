@@ -56,6 +56,7 @@ import com.tcgscanner.offline.R
 import com.tcgscanner.offline.core.GameDef
 import com.tcgscanner.offline.core.GameId
 import com.tcgscanner.offline.core.Games
+import com.tcgscanner.offline.data.remote.CatalogUrls
 import com.tcgscanner.offline.data.repo.PortfolioSummary
 import com.tcgscanner.offline.ui.appViewModel
 import com.tcgscanner.offline.ui.components.EmptyState
@@ -73,7 +74,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-data class HubTile(val game: GameDef, val summary: PortfolioSummary, val catalogCards: Int)
+data class HubTile(val game: GameDef, val summary: PortfolioSummary, val catalogCards: Int, val needsSource: Boolean = false)
 
 class HubViewModel(private val c: AppContainer) : ViewModel() {
     val active: StateFlow<Set<GameId>> =
@@ -84,7 +85,11 @@ class HubViewModel(private val c: AppContainer) : ViewModel() {
     val tiles: StateFlow<List<HubTile>> = active.flatMapLatest { ids ->
         if (ids.isEmpty()) flowOf(emptyList())
         else combine(ids.sortedBy { it.ordinal }.map { id ->
-            combine(c.portfolio.observeSummary(id), c.catalog.observeCount(id)) { s, n -> HubTile(Games[id], s, n) }
+            combine(c.portfolio.observeSummary(id), c.catalog.observeCount(id), c.settingsState) { s, n, settings ->
+                // No built-in URL (Gundam, Riftbound, Fusion World), none pasted yet and nothing imported: ask the user.
+                val needs = n == 0 && CatalogUrls.requiresUserSource(id) && settings?.catalogUrls?.containsKey(id) != true
+                HubTile(Games[id], s, n, needs)
+            }
         }) { it.toList() }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -188,7 +193,9 @@ private fun GameTile(tile: HubTile, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (tile.catalogCards == 0) {
+            if (tile.needsSource) {
+                Text(stringResource(R.string.needs_source_short), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.tertiary)
+            } else if (tile.catalogCards == 0) {
                 Text(stringResource(R.string.not_synced), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.tertiary)
             }
         }
