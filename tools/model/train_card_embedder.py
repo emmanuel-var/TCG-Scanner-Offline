@@ -228,10 +228,12 @@ class CosFaceHead(keras.layers.Layer):
         return {**super().get_config(), "num_classes": self.num_classes, "scale": self.scale, "margin": self.margin}
 
 
-def build_models(size: int, dim: int, num_classes: int, weights: str | None):
+def build_models(size: int, dim: int, num_classes: int, weights: str | None, scale: float = 30.0, margin: float = 0.25):
     inputs = keras.Input((size, size, 3), name="art")
     backbone = keras.applications.MobileNetV2(input_shape=(size, size, 3), include_top=False, weights=weights, alpha=1.0)
-    x = backbone(inputs, training=False)  # BatchNorm statistics stay frozen; fine for small per-class data
+    # With ImageNet weights BatchNorm keeps its pretrained statistics (inference mode): stable on small per-class data.
+    # From scratch (--weights none) the statistics are meaningless, so BatchNorm must learn them (follow fit mode).
+    x = backbone(inputs, training=False if weights else None)
     x = keras.layers.GlobalAveragePooling2D()(x)
     x = keras.layers.Dropout(0.2)(x)
     x = keras.layers.Dense(dim, use_bias=False, name="embedding_dense")(x)
@@ -239,7 +241,7 @@ def build_models(size: int, dim: int, num_classes: int, weights: str | None):
     embedder = keras.Model(inputs, embedding, name="card_embedder")
 
     labels = keras.Input((), dtype="int32", name="label")
-    logits = CosFaceHead(num_classes, name="cosface")([embedding, labels])
+    logits = CosFaceHead(num_classes, scale=scale, margin=margin, name="cosface")([embedding, labels])
     trainer = keras.Model([inputs, labels], logits, name="trainer")
     return embedder, trainer, backbone
 
@@ -258,6 +260,16 @@ def fit_phase(trainer, dataset, epochs: int, steps: int, learning_rate, label: s
     print(f"== {label}: {epochs} epochs x {steps} steps")
     compile_trainer(trainer, learning_rate)
     trainer.fit(dataset.map(lambda img, y: ((img, y), y)), epochs=epochs, steps_per_epoch=steps, verbose=2)
+
+
+def recalibrate_batchnorm(embedder: keras.Model, backbone: keras.Model, dataset: tf.data.Dataset, batches: int = 80) -> None:
+    """From-scratch runs only: refresh BatchNorm moving statistics on augmented data so inference mode matches
+    training mode. (With ImageNet weights BatchNorm is frozen in inference mode throughout, nothing to do.)"""
+    norms = [layer for layer in backbone.layers if isinstance(layer, keras.layers.BatchNormalization)]
+    for layer in norms:
+        layer.momentum = 0.8
+    for images, _ in dataset.take(batches):
+        embedder(images, training=True)
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -334,6 +346,11 @@ def main() -> int:
     parser.add_argument("--eval-cards", type=int, default=500)
     parser.add_argument("--eval-queries", type=int, default=2)
     parser.add_argument("--min-top1", type=float, default=0.0, help="exit with an error if retrieval top-1 is lower")
+    parser.add_argument("--aug-strength", type=float, default=1.0, help="1.0 = full camera-like distortion")
+    parser.add_argument("--head-lr", type=float, default=1e-3, help="learning rate while the backbone is frozen")
+    parser.add_argument("--finetune-lr", type=float, default=2e-4)
+    parser.add_argument("--cosface-scale", type=float, default=30.0)
+    parser.add_argument("--cosface-margin", type=float, default=0.25)
     parser.add_argument("--seed", type=int, default=7)
     args = parser.parse_args()
 
@@ -351,22 +368,26 @@ def main() -> int:
 
     weights = None if args.weights == "none" else "imagenet"
     try:
-        embedder, trainer, backbone = build_models(args.image_size, args.embedding_dim, num_classes, weights)
+        embedder, trainer, backbone = build_models(args.image_size, args.embedding_dim, num_classes, weights, args.cosface_scale, args.cosface_margin)
     except Exception as error:  # ImageNet weights not downloadable (offline machine)
         if weights is None:
             raise
         print(f"Could not load ImageNet weights ({error}); training from scratch. Expect worse accuracy.")
-        embedder, trainer, backbone = build_models(args.image_size, args.embedding_dim, num_classes, None)
+        weights = None
+        embedder, trainer, backbone = build_models(args.image_size, args.embedding_dim, num_classes, None, args.cosface_scale, args.cosface_margin)
 
-    dataset = make_train_dataset(refs, args.batch_size, strength=1.0, seed=args.seed)
+    dataset = make_train_dataset(refs, args.batch_size, strength=args.aug_strength, seed=args.seed)
 
     backbone.trainable = False
-    fit_phase(trainer, dataset, args.epochs_warmup, steps, 1e-3, "warm-up (head only)")
+    fit_phase(trainer, dataset, args.epochs_warmup, steps, args.head_lr, "warm-up (head only)")
 
     backbone.trainable = True
     total_steps = max(1, args.epochs_finetune * steps)
-    schedule = keras.optimizers.schedules.CosineDecay(2e-4, total_steps)
+    schedule = keras.optimizers.schedules.CosineDecay(args.finetune_lr, total_steps)
     fit_phase(trainer, dataset, args.epochs_finetune, steps, schedule, "fine-tune (all layers)")
+
+    if weights is None:
+        recalibrate_batchnorm(embedder, backbone, dataset)
 
     print("== exporting TensorFlow Lite")
     model_bytes = export_tflite(embedder, refs, args.quantize)

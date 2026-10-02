@@ -119,7 +119,7 @@ El proyecto se escribió en un entorno sin Android SDK ni acceso a Google Maven,
 * compilación de `core`, `data/remote` (todas las fuentes), entidades, valoración, parser OCR y modelos de intercambio;
 * 46 pruebas unitarias en `app/src/test` (texto, parser OCR, valoración, CSV, veredicto de intercambio, adaptadores y detección de formato incl. vegapull y CGS, llaves estables, re-vinculación, estados del modelo);
 * pruebas adicionales de `UrlCatalogSource` contra respuestas simuladas (paginación, descriptor de Scryfall, índice vegapull, descriptor CGS, override con enlace *blob*, juegos sin URL, enlace caído);
-* el script de entrenamiento se ejecutó de punta a punta con TensorFlow 2.21 sobre cartas sintéticas (sin pesos ImageNet): exporta un `.tflite` de ~4.6 MB y evalúa. **No lo entrené con cartas reales**, así que no hay cifras de precisión reales todavía.
+* el script de entrenamiento se ejecutó de punta a punta con TensorFlow 2.21 sobre 60 cartas sintéticas, sin pesos ImageNet y en pocos minutos de CPU: entrena (la precisión de entrenamiento sube), exporta un `.tflite` de ~4.7 MB y lo evalúa con el intérprete TFLite (top-1 ≈ 0.42 / top-5 ≈ 0.68 frente a consultas muy distorsionadas, azar ≈ 0.02). **No lo entrené con cartas reales ni con pesos ImageNet** (descarga bloqueada aquí), así que no hay cifras de precisión reales todavía.
 
 Antes de publicar: compila en Android Studio, corrige cualquier error menor de API, y prueba en dispositivo real el escáner, el arrastrar y soltar, Nearby (dos teléfonos con Google Play Services) y las fuentes con red real.
 

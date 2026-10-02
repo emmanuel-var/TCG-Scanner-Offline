@@ -51,4 +51,8 @@ python train_card_embedder.py --images images --out build --weights none --image
     --embedding-dim 32 --epochs-warmup 1 --epochs-finetune 1 --max-classes 200
 ```
 
-Without ImageNet weights accuracy is poor by design; this only checks the pipeline end to end.
+Without ImageNet weights accuracy is poor by design; this only checks the pipeline end to end. From-scratch runs
+recalibrate BatchNorm statistics before export (otherwise inference mode would not match training mode); with
+ImageNet weights BatchNorm stays frozen in inference mode throughout. Tune `--aug-strength`, `--cosface-scale`,
+`--cosface-margin`, `--head-lr` and `--finetune-lr` for your data; if `--weights imagenet` cannot download, the script
+falls back to training from scratch and says so.
