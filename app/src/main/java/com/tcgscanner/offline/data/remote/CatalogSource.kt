@@ -4,7 +4,6 @@ import com.tcgscanner.offline.core.CardCategory
 import com.tcgscanner.offline.core.CardVariant
 import com.tcgscanner.offline.core.GameDef
 import com.tcgscanner.offline.core.SourceId
-import com.tcgscanner.offline.data.prefs.ApiKeys
 
 data class RemoteGradedPrice(val company: String, val gradeX10: Int, val usd: Double)
 
@@ -33,15 +32,13 @@ fun interface CatalogSink {
 
 data class SyncProgress(val message: String, val fraction: Float? = null)
 
-class SourceNotConfigured(message: String) : Exception(message)
-
 interface CatalogSource {
     val id: SourceId
 
-    /** False when the source needs credentials the user has not entered yet. */
-    fun isConfigured(keys: ApiKeys): Boolean = true
+    /** Human-readable origin shown in Settings after a sync (e.g. the host of the catalog URL). */
+    val label: String get() = id.label
 
-    suspend fun sync(game: GameDef, keys: ApiKeys, sink: CatalogSink, progress: (SyncProgress) -> Unit)
+    suspend fun sync(game: GameDef, sink: CatalogSink, progress: (SyncProgress) -> Unit)
 }
 
 /** Buffers cards and flushes them to the sink in fixed-size batches. */

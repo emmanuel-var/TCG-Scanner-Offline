@@ -63,6 +63,7 @@ import com.tcgscanner.offline.ui.moneyText
 import com.tcgscanner.offline.ui.nav.Routes
 import com.tcgscanner.offline.ui.relativeTime
 import com.tcgscanner.offline.ui.theme.Semantic
+import com.tcgscanner.offline.work.SyncScheduler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -91,7 +92,7 @@ class DashboardViewModel(private val c: AppContainer) : ViewModel() {
 
     val sync: StateFlow<SyncUiState> = c.sync.state
 
-    fun syncNow(game: GameId) = c.sync.start(listOf(game))
+    fun syncNow(game: GameId) = SyncScheduler.enqueueNow(c.app, listOf(game), wifiOnly = false, manual = true)
 }
 
 private enum class Range(val labelRes: Int, val days: Int?) {
@@ -244,7 +245,7 @@ private fun SyncCard(lastSync: Long?, catalogCards: Int, sync: SyncUiState, game
             val result = sync.results[game.id]
             if (!sync.running && result != null && !result.success) {
                 Text(
-                    if (result.error == "NO_SOURCE") stringResource(R.string.sync_no_source) else stringResource(R.string.sync_failed, result.error.orEmpty()),
+                    stringResource(R.string.sync_failed, result.error.orEmpty()),
                     color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium
                 )
             }

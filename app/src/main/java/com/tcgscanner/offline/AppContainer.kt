@@ -6,18 +6,11 @@ import com.tcgscanner.offline.data.db.AppDatabase
 import com.tcgscanner.offline.data.prefs.AppSettings
 import com.tcgscanner.offline.data.prefs.SettingsStore
 import com.tcgscanner.offline.data.remote.Http
-import com.tcgscanner.offline.data.remote.sources.CustomJsonSource
-import com.tcgscanner.offline.data.remote.sources.DigimonCardIoSource
-import com.tcgscanner.offline.data.remote.sources.LorcanaApiSource
 import com.tcgscanner.offline.data.remote.sources.LorcastSource
 import com.tcgscanner.offline.data.remote.sources.MtgJsonSource
 import com.tcgscanner.offline.data.remote.sources.OptcgSource
-import com.tcgscanner.offline.data.remote.sources.PokemonTcgIoSource
-import com.tcgscanner.offline.data.remote.sources.PriceChartingSource
-import com.tcgscanner.offline.data.remote.sources.ScryfallSource
 import com.tcgscanner.offline.data.remote.sources.TcgdexSource
-import com.tcgscanner.offline.data.remote.sources.TcgplayerSource
-import com.tcgscanner.offline.data.remote.sources.YgoProDeckSource
+import com.tcgscanner.offline.data.remote.sources.UrlCatalogSource
 import com.tcgscanner.offline.data.repo.BackupRepository
 import com.tcgscanner.offline.data.repo.CatalogRepository
 import com.tcgscanner.offline.data.repo.CollectionRepository
@@ -25,6 +18,8 @@ import com.tcgscanner.offline.data.repo.CsvExporter
 import com.tcgscanner.offline.data.repo.DeckRepository
 import com.tcgscanner.offline.data.repo.PortfolioRepository
 import com.tcgscanner.offline.data.repo.SyncCoordinator
+import com.tcgscanner.offline.scanner.ModelConfig
+import com.tcgscanner.offline.scanner.ModelRepository
 import com.tcgscanner.offline.scanner.ScanMatcher
 import com.tcgscanner.offline.scanner.TfliteEmbedder
 import com.tcgscanner.offline.scanner.VisualIndexer
@@ -36,6 +31,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import java.io.File
 
 /** Hand-rolled dependency container: no DI framework, no reflection, nothing to configure. */
 class AppContainer(val app: Application) {
@@ -50,10 +46,8 @@ class AppContainer(val app: Application) {
         settings.settings.stateIn(scope, SharingStarted.Eagerly, null)
 
     private val sources = listOf(
-        PokemonTcgIoSource(http), ScryfallSource(http), MtgJsonSource(http), YgoProDeckSource(http),
-        OptcgSource(http), LorcastSource(http), LorcanaApiSource(http), DigimonCardIoSource(http),
-        TcgdexSource(http), TcgplayerSource(http), PriceChartingSource(http),
-        CustomJsonSource(http) { game: GameId -> settings.customUrlOnce(game) }
+        UrlCatalogSource(http) { game: GameId -> settings.catalogUrlOnce(game) },
+        MtgJsonSource(http), OptcgSource(http), LorcastSource(http), TcgdexSource(http)
     ).associateBy { it.id }
 
     val catalog = CatalogRepository(db, settings, sources)
@@ -64,7 +58,8 @@ class AppContainer(val app: Application) {
     val csv = CsvExporter(db)
     val backup = BackupRepository(db)
 
-    val embedder by lazy { TfliteEmbedder(app) }
+    val embedder by lazy { TfliteEmbedder(File(app.filesDir, ModelConfig.FILE_NAME)) }
+    val models by lazy { ModelRepository(app, scope, settings, embedder) }
     val scanMatcher = ScanMatcher(db)
     val visualMatcher by lazy { VisualMatcher(db, embedder) }
     val indexer by lazy { VisualIndexer(scope, db, http, embedder, visualMatcher) }

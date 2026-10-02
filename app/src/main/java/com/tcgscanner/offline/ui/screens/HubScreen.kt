@@ -61,6 +61,7 @@ import com.tcgscanner.offline.ui.appViewModel
 import com.tcgscanner.offline.ui.components.EmptyState
 import com.tcgscanner.offline.ui.components.GameEmblem
 import com.tcgscanner.offline.ui.moneyText
+import com.tcgscanner.offline.work.SyncScheduler
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -95,7 +96,13 @@ class HubViewModel(private val c: AppContainer) : ViewModel() {
     }
 
     fun setActive(games: Set<GameId>) {
-        viewModelScope.launch { c.settings.setActiveGames(games) }
+        viewModelScope.launch {
+            val before = c.settings.current()
+            c.settings.setActiveGames(games)
+            // First run for a newly added game: download its catalog in the background (WorkManager).
+            val added = games - before.activeGames
+            SyncScheduler.enqueueNow(c.app, added, before.wifiOnlySync, manual = false)
+        }
     }
 }
 

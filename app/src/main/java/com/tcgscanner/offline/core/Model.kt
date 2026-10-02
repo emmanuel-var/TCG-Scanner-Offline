@@ -79,16 +79,10 @@ enum class DeckZone(val code: String, @StringRes val labelRes: Int) {
 }
 
 enum class SourceId(val label: String) {
-    POKEMON_TCG_IO("Pokémon TCG API"),
-    SCRYFALL("Scryfall"),
+    /** The per-game catalog URL (community default or the user's override); format is auto-detected. */
+    CATALOG_URL("Catalog URL"),
     MTGJSON("MTGJSON"),
-    YGOPRODECK("YGOPRODeck"),
     OPTCG("OPTCG API"),
     LORCAST("Lorcast"),
-    LORCANA_API("Lorcana API"),
-    DIGIMONCARD_IO("DigimonCard.io"),
-    TCGDEX("TCGdex"),
-    TCGPLAYER("TCGplayer"),
-    PRICECHARTING("PriceCharting"),
-    CUSTOM("Custom catalog")
+    TCGDEX("TCGdex")
 }

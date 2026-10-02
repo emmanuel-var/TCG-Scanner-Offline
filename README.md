@@ -13,7 +13,7 @@ Sin servidores propios, sin cuentas, sin anuncios, sin suscripciones. Exportar a
 | Paywalls | CSV, respaldo JSON, escaneo y mazos sin límites ni pagos |
 | Raw vs Graded | Valores separados; PSA/BGS/CGC/SGC con precio publicado, manual o estimado (marcado con ≈) |
 | Master Sets | Barras de progreso por set; faltantes en escala de grises; modo «master» (todas las variantes) |
-| Bases de datos asiáticas | Pokémon Japón con OCR japonés (ML Kit) y fuentes PriceCharting / TCGdex |
+| Bases de datos asiáticas | Pokémon Japón con OCR japonés (ML Kit) y fuentes pokemontcg.io / TCGdex |
 
 ## Pantallas
 
@@ -23,7 +23,7 @@ Sin servidores propios, sin cuentas, sin anuncios, sin suscripciones. Exportar a
 4. **Gestor de mazos** – agrupado por tipo, arrastrar y soltar (resultados → mazo/sideboard, y entre zonas), botones +/− accesibles, faltantes en rojo como lista de deseos con costo estimado.
 5. **Catálogo y Master Sets** – sets con porcentaje, detalle con cartas faltantes en gris, alta de cartas propias.
 6. **Trade Binder** – carrusel con el valor total disponible para intercambio.
-7. **Ajustes** – sincronizar precios, CSV, respaldo/restauración JSON, claves de API opcionales, índice de ilustraciones, importar catálogo, borrar datos.
+7. **Ajustes** – sincronizar precios, CSV, respaldo/restauración JSON, índice de ilustraciones, importar catálogo, borrar datos.
 8. **Intercambio P2P** – Google Nearby Connections (Bluetooth / Wi-Fi Direct, sin internet): emparejamiento con código, comparación de binders y veredicto justo/injusto con **tus** precios locales.
 
 ## Arquitectura
@@ -35,44 +35,48 @@ app/src/main/java/com/tcgscanner/offline
 │   ├── db/      Room: cartas, precios, graded, colección, mazos, snapshots, firmas
 │   ├── remote/  Http (OkHttp) + fuentes de catálogo con fallback
 │   ├── repo/    catálogo/sincronización, colección, portafolio, mazos, CSV, respaldo
-│   └── prefs/   DataStore (ajustes y claves opcionales)
-├── scanner/     parser OCR, matcher, analizador CameraX, firmas visuales, TFLite
+│   └── prefs/   DataStore (ajustes y URLs de catálogo)
+├── scanner/     parser OCR, matcher, analizador CameraX, firmas visuales, TFLite y ModelRepository
 ├── trade/       Nearby Connections + protocolo de intercambio
-├── work/        WorkManager: sincronización diaria
+├── work/        WorkManager: sincronización de catálogos y descarga del modelo
 └── ui/          Compose (Material 3), navegación, pantallas
 ```
 
 * **Sin framework de DI**: `AppContainer` manual.
 * **Datos de usuario a salvo**: no hay claves foráneas desde la colección hacia el catálogo, así que refrescar el catálogo nunca borra tu colección.
-* **Sync**: cada juego tiene una lista ordenada de fuentes (principal → respaldos). Se omiten las que requieren claves no configuradas. Los datos se guardan por lotes mientras se descargan (Scryfall se procesa en *streaming*).
+* **Sync**: cada juego tiene una lista ordenada de fuentes (principal → respaldos). Los datos se guardan por lotes mientras se descargan (Scryfall se procesa en *streaming*).
 * **Snapshots del portafolio**: uno por hora como máximo; el último valor de cada hora gana. La gráfica añade el valor «en vivo».
 
-## Fuentes de datos
+## Fuentes de datos (sin credenciales)
 
-| Juego | Orden de fuentes |
-|---|---|
-| Pokémon (EN) | Pokémon TCG API → TCGplayer\* → TCGdex → catálogo propio |
-| One Piece | OPTCG API → TCGplayer\* → catálogo propio |
-| Magic | Scryfall (bulk) → MTGJSON → catálogo propio |
-| Yu-Gi-Oh! | YGOPRODeck → catálogo propio |
-| Lorcana | Lorcast → Lorcana API → catálogo propio |
-| Riftbound, Gundam, Fusion World | TCGplayer\* → catálogo propio |
-| Pokémon Japón | PriceCharting\* (incluye precios graduados) → TCGdex (ja) → catálogo propio |
-| Digimon | DigimonCard.io → TCGplayer\* → catálogo propio |
+La app **no pide claves de API ni usa servidores propios**. Cada juego tiene una URL de base de datos por defecto (`data/remote/CatalogUrls.kt`) y una o dos fuentes públicas de respaldo:
 
-\* Requieren credenciales propias que el usuario pega en Ajustes (se guardan solo en el dispositivo).
+| Juego | URL por defecto | Respaldo |
+|---|---|---|
+| Pokémon | `api.pokemontcg.io/v2/cards` (paginado, 250 por página) | TCGdex |
+| Magic | `api.scryfall.com/bulk-data/default-cards` (descriptor → descarga masiva en *streaming*) | MTGJSON |
+| Yu-Gi-Oh! | `db.ygoprodeck.com/api/v7/cardinfo.php` | – |
+| Lorcana | `api.lorcana-api.com/cards/all` | Lorcast |
+| One Piece | `raw.githubusercontent.com/optcg-community/optcg-data/main/cards.json` | OPTCG API |
+| Digimon | `digimoncard.io/api-public/search.php?series=Digimon Card Game` | – |
+| Pokémon Japón | `api.pokemontcg.io/v2/cards?q=language:japanese` | TCGdex (ja) |
+| Fusion World | `raw.githubusercontent.com/limitless-community/dbs-fw-data/main/cards.json` | – |
+| Gundam | `raw.githubusercontent.com/bandai-tcg-community/gundam-db/main/cards.json` | – |
+| Riftbound | `raw.githubusercontent.com/riftbound-tts/mod-data/main/database.json` | – |
 
-**Importante – APIs de la lista original no incluidas:** Limitless TCG, Dreamborn, Yugipedia, Pokellector y los volcados «Bandai TCG Community JSON» no se integraron porque no existe (o no pude verificar) un endpoint público de catálogo estable para ellos. En su lugar:
-* se usaron alternativas con endpoints públicos conocidos (OPTCG API, Lorcast, Lorcana API, TCGdex);
-* cualquier juego admite un **catálogo propio** (`docs/CATALOG_FORMAT.md`): archivo JSON importable o URL https como última fuente. Así un volcado de la comunidad (p. ej. de GitHub) se conecta sin tocar código.
+**`UrlCatalogSource` detecta el formato** leyendo los primeros 16 KB (Pokémon TCG API, Scryfall, YGOPRODeck, lorcana-api, DigimonCard.io, el formato propio de `docs/CATALOG_FORMAT.md`) y, para cualquier otro JSON (volcados de la comunidad, datos de mods de Tabletop Simulator), usa un extractor genérico que busca objetos con forma de carta (nombre + número/imagen), con alias de campos (`Nickname`, `card_number`, `FaceURL`…).
 
-Los formatos de respuesta de las APIs se implementaron de forma defensiva a partir de su documentación pública; **verifícalos contra las respuestas reales** (ver «Estado de verificación»).
+**Override manual:** en *Ajustes → Bases de datos de cartas* cada juego activo tiene un campo «URL de la base de datos». Al guardar (un enlace `github.com/.../blob/...` se convierte solo a `raw.githubusercontent.com`) se encola un sync de WorkManager que actualiza Room desde ese enlace. Vacío = vuelve al valor por defecto. Solo se aceptan enlaces `https`.
+
+**Sincronización (WorkManager, `PriceSyncWorker`):** primera descarga al activar un juego (y en cada arranque si algún juego activo sigue sin catálogo), refresco diario periódico, «Sincronizar precios» manual y tras cambiar una URL. Las tareas se encadenan (`APPEND_OR_REPLACE`) y un `Mutex` garantiza un solo sync a la vez. Si la fuente principal falla o devuelve 0 cartas se prueban los respaldos; el catálogo anterior se conserva. Cambiar de fuente puede dejar cartas antiguas junto a las nuevas (la colección nunca se borra).
+
+> Varias de estas URLs comunitarias (One Piece, Fusion World, Gundam, Riftbound) **no pude verificarlas**: pueden no existir o tener otro esquema. Por eso existen el override, el extractor genérico y la importación de archivos locales. `pokemontcg.io` es un catálogo en inglés, así que es probable que la consulta `language:japanese` no devuelva nada y entre el respaldo TCGdex.
 
 ## Escáner
 
 1. **ML Kit Text Recognition** (modelo incluido en el APK, offline): lee nombre y número impreso (`OP01-120`, `025/198`, `LOB-EN005`…). `CardTextParser` extrae candidatos y `ScanMatcher` los cruza en Room solo para el juego activo (número exacto + similitud de nombre con tolerancia a errores de OCR). Hacen falta 2 lecturas consistentes antes de fijar.
 2. **Resolución de variantes**: *bottom sheet* con versión, estado/slab, cantidad y precio manual opcional, más «otras ediciones de esta carta».
-3. **Cartas de arte completo**: botón «Identificar por ilustración». Usa firmas precalculadas (dHash + aHash de la zona de arte) o, si incluyes `assets/models/card_embedder.tflite`, embeddings TFLite (ver `docs/SCANNER_MODEL.md`). Las firmas se generan una sola vez desde Ajustes (opcional, con descarga de imágenes).
+3. **Cartas de arte completo y motor visual**: el escáner abre con OCR inmediatamente, sin pantallas de carga. Si `filesDir/card_embedder.tflite` no existe, una tarjeta translúcida sobre la cámara ofrece descargarlo (~15 MB) con un `OneTimeWorkRequest` (`ModelDownloadWorker`: reanudable, escribe a `.part` y valida tamaño/SHA-256 antes de renombrar). `ModelRepository.state` (`StateFlow`) se deriva del `WorkInfo` y del archivo: `Missing → Downloading(progreso) → Ready`. Al llegar a `Ready` se carga el intérprete, la tarjeta desaparece y el botón «Identificar por ilustración» se habilita sin reiniciar nada. Las firmas de ilustraciones se generan desde Ajustes (opcional). Ver `docs/SCANNER_MODEL.md`.
 
 ## Compilar
 
@@ -102,8 +106,8 @@ Ver `docs/PLAY_STORE_CHECKLIST.md` y `docs/PRIVACY_POLICY.md`. Resumen: `targetS
 El proyecto se escribió en un entorno sin Android SDK ni acceso a Google Maven, por lo que **el APK completo no pudo compilarse allí**. Lo que sí se verificó con la JVM:
 
 * compilación de `core`, `data/remote` (todas las fuentes), entidades, valoración, parser OCR y modelos de intercambio;
-* 18 pruebas unitarias en `app/src/test` (texto, parser OCR, valoración, CSV, veredicto de intercambio, catálogo propio);
-* pruebas adicionales de las fuentes contra respuestas simuladas.
+* 31 pruebas unitarias en `app/src/test` (texto, parser OCR, valoración, CSV, veredicto de intercambio, adaptadores y detección de formato, estados del modelo);
+* pruebas adicionales de `UrlCatalogSource` y las fuentes de respaldo contra respuestas simuladas (paginación, descriptor de Scryfall, override con enlace *blob*, enlace caído).
 
 Antes de publicar: compila en Android Studio, corrige cualquier error menor de API, y prueba en dispositivo real el escáner, el arrastrar y soltar, Nearby (dos teléfonos con Google Play Services) y las fuentes con red real.
 

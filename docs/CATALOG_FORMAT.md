@@ -1,6 +1,6 @@
 # Custom catalog format
 
-Any game can be fed from a JSON file you import in **Settings → Custom catalog**, or from an `https://` URL used as the last fallback source during sync.
+Any game can be fed from a JSON file you import in **Settings** or from an `https://` URL set in **Settings → Card databases**. The app also understands the native formats of Pokémon TCG API, Scryfall, YGOPRODeck, lorcana-api and DigimonCard.io, and falls back to a tolerant extractor for other card-shaped JSON (including Tabletop Simulator mod data). The format below is the explicit one, the only one that can carry graded prices.
 
 ```json
 {

@@ -49,7 +49,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -61,7 +60,11 @@ import com.tcgscanner.offline.R
 import com.tcgscanner.offline.core.GameDef
 import com.tcgscanner.offline.core.GameId
 import com.tcgscanner.offline.core.Games
-import com.tcgscanner.offline.data.prefs.ApiKeys
+import com.tcgscanner.offline.data.remote.CatalogUrls
+import com.tcgscanner.offline.data.remote.UrlNormalizer
+import com.tcgscanner.offline.scanner.ModelConfig
+import com.tcgscanner.offline.scanner.ModelState
+import com.tcgscanner.offline.work.SyncScheduler
 import com.tcgscanner.offline.data.prefs.AppSettings
 import com.tcgscanner.offline.data.db.SyncStateEntity
 import com.tcgscanner.offline.data.repo.SyncUiState
@@ -95,20 +98,39 @@ class SettingsViewModel(private val c: AppContainer) : ViewModel() {
     private val _text = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val text: SharedFlow<String> = _text
 
-    fun syncAll() = c.sync.start(ui.value.settings.activeGames)
-    fun cancelSync() = c.sync.cancel()
+    /** Everything goes through WorkManager: the same worker serves the daily job, first runs and manual syncs. */
+    fun syncAll() = SyncScheduler.enqueueNow(c.app, ui.value.settings.activeGames, wifiOnly = false, manual = true)
+    fun syncGame(game: GameId) = SyncScheduler.enqueueNow(c.app, listOf(game), wifiOnly = false, manual = true)
+    fun cancelSync() { SyncScheduler.cancelNow(c.app); c.sync.cancel() }
     fun setWifiOnly(v: Boolean) { viewModelScope.launch { c.settings.setWifiOnly(v) } }
     fun setAutoSync(v: Boolean) { viewModelScope.launch { c.settings.setAutoSync(v) } }
     fun setNickname(v: String) { viewModelScope.launch { c.settings.setNickname(v) } }
-    fun setKeys(k: ApiKeys) { viewModelScope.launch { c.settings.setKeys(k); _messages.emit(R.string.saved) } }
     fun setActive(g: Set<GameId>) { viewModelScope.launch { c.settings.setActiveGames(g) } }
 
-    fun customUrl(game: GameId) = c.settings.customUrl(game)
-    fun setCustomUrl(game: GameId, url: String) {
+    /**
+     * Saves the user's database URL for [game] (blank restores the default) and queues a WorkManager sync so
+     * Room is refreshed from the new link. Returns a string resource when the link is not acceptable.
+     */
+    fun saveCatalogUrl(game: GameId, raw: String): Int? {
+        val clean = raw.trim()
+        if (clean.isNotEmpty() && !UrlNormalizer.isValid(clean)) return R.string.catalog_url_invalid
         viewModelScope.launch {
-            if (url.isNotBlank() && !url.startsWith("https://")) { _messages.emit(R.string.custom_url_https); return@launch }
-            c.settings.setCustomUrl(game, url); _messages.emit(R.string.saved)
+            c.settings.setCatalogUrl(game, UrlNormalizer.normalize(clean))
+            SyncScheduler.enqueueNow(c.app, listOf(game), wifiOnly = false, manual = true)
+            _messages.emit(R.string.catalog_url_saved)
         }
+        return null
+    }
+
+    // ---- visual engine ---------------------------------------------------------------------------------
+    val model: StateFlow<ModelState> get() = c.models.state
+    fun downloadModel() = c.models.download()
+    fun deleteModel() = c.models.delete()
+    fun saveModelUrl(raw: String): Int? {
+        val clean = raw.trim()
+        if (clean.isNotEmpty() && !UrlNormalizer.isValid(clean)) return R.string.catalog_url_invalid
+        viewModelScope.launch { c.settings.setModelUrl(UrlNormalizer.normalize(clean)); _messages.emit(R.string.saved) }
+        return null
     }
 
     fun exportCsv(context: Context, uri: Uri, games: Set<GameId>?) {
@@ -189,13 +211,10 @@ fun SettingsScreen(nav: NavController, onBack: () -> Unit) {
     val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.restore(context, uri) }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null && current != null) vm.importCatalog(context, uri, current) }
 
-    var keys by remember(s.keys) { mutableStateOf(s.keys) }
     var nickname by remember(s.nickname) { mutableStateOf(s.nickname) }
     var confirmErase by remember { mutableStateOf(false) }
     var confirmRestore by remember { mutableStateOf(false) }
-    var customUrl by remember(current?.id) { mutableStateOf("") }
-    val storedCustom = current?.let { vm.customUrl(it.id).collectAsStateWithLifecycle(initialValue = "").value }.orEmpty()
-    LaunchedEffect(storedCustom) { customUrl = storedCustom }
+    val model by vm.model.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -238,7 +257,7 @@ fun SettingsScreen(nav: NavController, onBack: () -> Unit) {
                         val failure = sync.results[id]?.takeIf { !it.success }
                         if (failure != null) {
                             Text(
-                                if (failure.error == "NO_SOURCE") stringResource(R.string.sync_no_source) else stringResource(R.string.sync_failed, failure.error.orEmpty()),
+                                stringResource(R.string.sync_failed, failure.error.orEmpty()),
                                 color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium
                             )
                         }
@@ -299,22 +318,55 @@ fun SettingsScreen(nav: NavController, onBack: () -> Unit) {
                     OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.import_catalog_file))
                     }
-                    OutlinedTextField(
-                        customUrl, { customUrl = it.take(300) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                        label = { Text(stringResource(R.string.custom_catalog_url)) }
-                    )
-                    OutlinedButton(onClick = { vm.setCustomUrl(current.id, customUrl) }) { Text(stringResource(R.string.save)) }
                 }
             }
 
-            // ---- API keys ------------------------------------------------------------------------------------
-            Section(stringResource(R.string.section_keys)) {
-                Text(stringResource(R.string.keys_explainer), style = MaterialTheme.typography.bodyMedium)
-                KeyField(stringResource(R.string.key_pokemon), keys.pokemonTcgKey) { keys = keys.copy(pokemonTcgKey = it) }
-                KeyField(stringResource(R.string.key_tcgplayer_id), keys.tcgplayerClientId) { keys = keys.copy(tcgplayerClientId = it) }
-                KeyField(stringResource(R.string.key_tcgplayer_secret), keys.tcgplayerClientSecret) { keys = keys.copy(tcgplayerClientSecret = it) }
-                KeyField(stringResource(R.string.key_pricecharting), keys.priceChartingToken) { keys = keys.copy(priceChartingToken = it) }
-                Button(onClick = { vm.setKeys(keys) }) { Text(stringResource(R.string.save)) }
+            // ---- Card database URLs (community sources, user-overridable) ------------------------------------
+            Section(stringResource(R.string.section_catalog_urls)) {
+                Text(stringResource(R.string.catalog_urls_explainer), style = MaterialTheme.typography.bodyMedium)
+                s.activeGames.sortedBy { it.ordinal }.forEach { id ->
+                    CatalogUrlRow(
+                        game = Games[id],
+                        saved = s.catalogUrls[id].orEmpty(),
+                        default = CatalogUrls.default(id),
+                        busy = sync.running,
+                        onSave = { vm.saveCatalogUrl(id, it) },
+                        onSyncNow = { vm.syncGame(id) }
+                    )
+                }
+                if (s.activeGames.isEmpty()) Text(stringResource(R.string.hub_empty_message), style = MaterialTheme.typography.bodyMedium)
+            }
+
+            // ---- Visual engine (optional TensorFlow Lite model) ----------------------------------------------
+            Section(stringResource(R.string.section_visual_engine)) {
+                Text(stringResource(R.string.visual_engine_explainer, ModelConfig.APPROX_SIZE_MB), style = MaterialTheme.typography.bodyMedium)
+                when (val m = model) {
+                    is ModelState.Ready -> {
+                        Text(stringResource(R.string.model_ready), style = MaterialTheme.typography.titleMedium)
+                        OutlinedButton(onClick = vm::deleteModel) { Text(stringResource(R.string.model_delete)) }
+                    }
+                    is ModelState.Downloading -> {
+                        val p = m.progress
+                        if (p != null) LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
+                        else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Text(stringResource(R.string.model_downloading), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    is ModelState.Failed -> {
+                        Text(stringResource(R.string.model_failed), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                        Button(onClick = vm::downloadModel) { Text(stringResource(R.string.model_retry)) }
+                    }
+                    is ModelState.Missing -> Button(onClick = vm::downloadModel) { Text(stringResource(R.string.model_download)) }
+                }
+                var modelUrl by remember(s.modelUrl) { mutableStateOf(s.modelUrl) }
+                var modelUrlError by remember { mutableStateOf<Int?>(null) }
+                OutlinedTextField(
+                    modelUrl, { modelUrl = it.take(400); modelUrlError = null }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.model_url_label)) },
+                    placeholder = { Text(ModelConfig.DEFAULT_URL) },
+                    isError = modelUrlError != null,
+                    supportingText = { modelUrlError?.let { Text(stringResource(it)) } }
+                )
+                OutlinedButton(onClick = { modelUrlError = vm.saveModelUrl(modelUrl) }, enabled = modelUrl != s.modelUrl) { Text(stringResource(R.string.save)) }
             }
 
             // ---- About / data ---------------------------------------------------------------------------------
@@ -374,9 +426,34 @@ private fun SwitchRow(title: String, hint: String, checked: Boolean, onChange: (
 }
 
 @Composable
-private fun KeyField(label: String, value: String, onChange: (String) -> Unit) {
-    OutlinedTextField(
-        value, { onChange(it.take(200)) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-        label = { Text(label) }, visualTransformation = PasswordVisualTransformation()
-    )
+private fun CatalogUrlRow(
+    game: GameDef,
+    saved: String,
+    default: String,
+    busy: Boolean,
+    onSave: (String) -> Int?,
+    onSyncNow: () -> Unit
+) {
+    var text by remember(saved) { mutableStateOf(saved) }
+    var error by remember { mutableStateOf<Int?>(null) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(stringResource(game.nameRes), style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it.take(500); error = null },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.catalog_url_label)) },
+            placeholder = { Text(default) },
+            isError = error != null,
+            supportingText = {
+                Text(error?.let { stringResource(it) } ?: stringResource(R.string.catalog_url_default, default))
+            }
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = { error = onSave(text) }, enabled = text.trim() != saved) { Text(stringResource(R.string.save)) }
+            TextButton(onClick = { text = ""; error = onSave("") }, enabled = saved.isNotEmpty()) { Text(stringResource(R.string.catalog_url_reset)) }
+            TextButton(onClick = onSyncNow, enabled = !busy) { Text(stringResource(R.string.catalog_url_sync)) }
+        }
+    }
 }

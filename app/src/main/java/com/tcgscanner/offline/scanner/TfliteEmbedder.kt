@@ -1,9 +1,9 @@
 package com.tcgscanner.offline.scanner
 
-import android.content.Context
 import android.graphics.Bitmap
 import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
+import java.io.File
 import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -11,25 +11,45 @@ import java.nio.channels.FileChannel
 import kotlin.math.sqrt
 
 /**
- * Optional on-device image classifier head (e.g. MobileNetV2 feature extractor) turning a card image into an
- * embedding vector. It activates only when `assets/models/card_embedder.tflite` is bundled; otherwise the
- * app transparently falls back to perceptual hashes. See docs/SCANNER_MODEL.md.
+ * Optional on-device image embedder (e.g. a MobileNetV2 feature extractor). The model is NOT bundled in the
+ * APK: it is downloaded on demand into filesDir ([ModelConfig.FILE_NAME]). Until it is there, everything
+ * returns null and the scanner keeps working with OCR and perceptual hashes. See docs/SCANNER_MODEL.md.
  */
-class TfliteEmbedder(context: Context) {
-    private val interpreter: Interpreter? = try {
-        context.assets.openFd(MODEL_ASSET).use { fd ->
-            FileInputStream(fd.fileDescriptor).channel.use { ch ->
-                Interpreter(ch.map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength), Interpreter.Options().apply { setNumThreads(2) })
-            }
-        }
-    } catch (e: Exception) {
-        null // model not bundled
+class TfliteEmbedder(private val modelFile: File) {
+    @Volatile private var interpreter: Interpreter? = null
+
+    val isAvailable: Boolean get() = interpreter != null || load()
+
+    /** Drops the current interpreter and loads the file again; true when a usable model is in place. */
+    @Synchronized
+    fun reload(): Boolean {
+        unload()
+        return load()
     }
 
-    val isAvailable: Boolean get() = interpreter != null
+    @Synchronized
+    fun unload() {
+        interpreter?.close()
+        interpreter = null
+    }
+
+    @Synchronized
+    private fun load(): Boolean {
+        if (interpreter != null) return true
+        if (!modelFile.isFile || modelFile.length() == 0L) return false
+        interpreter = try {
+            FileInputStream(modelFile).channel.use { ch ->
+                Interpreter(ch.map(FileChannel.MapMode.READ_ONLY, 0, ch.size()), Interpreter.Options().apply { setNumThreads(2) })
+            }
+        } catch (e: Exception) {
+            null // corrupt or incompatible file
+        }
+        return interpreter != null
+    }
 
     @Synchronized
     fun embed(bitmap: Bitmap): FloatArray? {
+        if (!isAvailable) return null
         val it = interpreter ?: return null
         val shape = it.getInputTensor(0).shape() // [1, h, w, 3]
         val h = shape[1]
@@ -50,8 +70,7 @@ class TfliteEmbedder(context: Context) {
             }
         }
         input.rewind()
-        val outShape = it.getOutputTensor(0).shape()
-        val n = outShape.last()
+        val n = it.getOutputTensor(0).shape().last()
         val out = Array(1) { FloatArray(n) }
         it.run(input, out)
         val v = out[0]
@@ -61,8 +80,6 @@ class TfliteEmbedder(context: Context) {
     }
 
     companion object {
-        const val MODEL_ASSET = "models/card_embedder.tflite"
-
         fun toBytes(v: FloatArray): ByteArray {
             val b = ByteBuffer.allocate(v.size * 4).order(ByteOrder.LITTLE_ENDIAN)
             v.forEach { b.putFloat(it) }

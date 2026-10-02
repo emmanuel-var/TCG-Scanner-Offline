@@ -91,6 +91,13 @@ import com.tcgscanner.offline.R
 import com.tcgscanner.offline.core.GameDef
 import com.tcgscanner.offline.core.OcrScript
 import com.tcgscanner.offline.scanner.CardAnalyzer
+import com.tcgscanner.offline.scanner.ModelState
+import com.tcgscanner.offline.ui.components.ModelPromptCard
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import com.tcgscanner.offline.ui.appViewModel
 import com.tcgscanner.offline.ui.components.AddCardSheet
 import com.tcgscanner.offline.ui.components.CardImage
@@ -108,6 +115,8 @@ fun ScannerScreen(nav: NavController) {
     val game by vm.game.collectAsStateWithLifecycle()
     val ui by vm.ui.collectAsStateWithLifecycle()
     val catalogCount by vm.catalogCount.collectAsStateWithLifecycle()
+    val modelState by vm.modelState.collectAsStateWithLifecycle()
+    val identifyEnabled by vm.identifyEnabled.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val haptics = LocalHapticFeedback.current
     var searching by remember { mutableStateOf(false) }
@@ -150,7 +159,8 @@ fun ScannerScreen(nav: NavController) {
                 )
                 else -> CameraSection(
                     vm = vm, game = game!!, torch = torch, onTorchAvailable = { hasTorch = it },
-                    catalogEmpty = catalogCount == 0, liveGuess = ui.liveGuess, busy = ui.artworkBusy
+                    catalogEmpty = catalogCount == 0, liveGuess = ui.liveGuess, busy = ui.artworkBusy,
+                    modelState = modelState, identifyEnabled = identifyEnabled
                 )
             }
         }
@@ -207,7 +217,9 @@ private fun CameraSection(
     onTorchAvailable: (Boolean) -> Unit,
     catalogEmpty: Boolean,
     liveGuess: String?,
-    busy: Boolean
+    busy: Boolean,
+    modelState: ModelState,
+    identifyEnabled: Boolean
 ) {
     val guide = remember { AtomicReference(RectF(0.1f, 0.1f, 0.9f, 0.9f)) }
     var viewSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
@@ -245,6 +257,14 @@ private fun CameraSection(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Non-intrusive notice: the camera and OCR are already live; this only offers the optional engine.
+            AnimatedVisibility(
+                visible = modelState !is ModelState.Ready,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                ModelPromptCard(modelState, onDownload = vm::downloadModel)
+            }
             if (catalogEmpty) {
                 Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.errorContainer) {
                     Text(stringResource(R.string.scan_catalog_empty), Modifier.padding(12.dp), color = MaterialTheme.colorScheme.onErrorContainer, textAlign = TextAlign.Center)
@@ -263,7 +283,7 @@ private fun CameraSection(
                     Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = Color.White, textAlign = TextAlign.Center
                 )
             }
-            FilledTonalButton(onClick = vm::identifyByArtwork, enabled = !busy) {
+            FilledTonalButton(onClick = vm::identifyByArtwork, enabled = identifyEnabled && !busy) {
                 if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Icon(Icons.Filled.Image, contentDescription = null)
                 Text(stringResource(R.string.identify_by_artwork), Modifier.padding(start = 8.dp))
             }

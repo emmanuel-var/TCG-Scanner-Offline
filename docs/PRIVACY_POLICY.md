@@ -8,7 +8,7 @@ _Last updated: 2026-10-02_
 Your collection, decks, portfolio history, settings and the downloaded card catalog are stored **only in the app's private storage on your device**. There is no account and nothing is uploaded to the developer.
 
 ## Network access
-The app connects to public card-data services (such as Pokémon TCG API, Scryfall, MTGJSON, YGOPRODeck, OPTCG API, Lorcast, Lorcana API, DigimonCard.io, TCGdex, and – only if you enter your own credentials – TCGplayer and PriceCharting) to download catalogs, prices and card images. These services receive standard request data such as your IP address and, where you entered one, the API key for that service. Their own privacy policies apply.
+The app connects to public card-data sources (by default Pokémon TCG API, Scryfall, YGOPRODeck, Lorcana API, DigimonCard.io and community JSON files hosted on GitHub; you can replace any of these links in Settings) to download catalogs, prices and card images, and to download the optional visual-engine model. These services receive standard request data such as your IP address. No account or API key is involved. Their own privacy policies apply.
 
 ## Camera
 The camera feed is analysed in real time on the device (text recognition and image matching). Images are not stored or transmitted.

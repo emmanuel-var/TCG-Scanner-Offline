@@ -11,6 +11,7 @@ import com.tcgscanner.offline.core.Text
 import com.tcgscanner.offline.data.db.CardWithPrices
 import com.tcgscanner.offline.data.repo.AddSpec
 import com.tcgscanner.offline.scanner.CardTextParser
+import com.tcgscanner.offline.scanner.ModelState
 import com.tcgscanner.offline.scanner.OcrLine
 import com.tcgscanner.offline.ui.currentGameFlow
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +56,15 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
     val catalogCount: StateFlow<Int> = c.currentGameFlow().flatMapLatest { c.catalog.observeCount(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    /** Visual model: Missing -> Downloading(progress) -> Ready. Collected by the UI, so it recomposes live. */
+    val modelState: StateFlow<ModelState> = c.models.state
+
+    /** "Identify by artwork" is only offered once the model is on disk and loaded. */
+    val identifyEnabled: StateFlow<Boolean> = c.models.state.map { it is ModelState.Ready }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), c.models.state.value is ModelState.Ready)
+
+    fun downloadModel() = c.models.download()
+
     private var streakId: String? = null
     private var streak = 0
     private var cooldownUntil = 0L
@@ -88,7 +98,7 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
     // ---- artwork path -----------------------------------------------------------------------------
 
     fun identifyByArtwork() {
-        if (_ui.value.artworkBusy) return
+        if (_ui.value.artworkBusy || !identifyEnabled.value) return
         _ui.update { it.copy(artworkBusy = true) }
         captureRequested.set(true)
     }

@@ -12,12 +12,12 @@ import com.tcgscanner.offline.data.db.GradedPriceEntity
 import com.tcgscanner.offline.data.db.SetRow
 import com.tcgscanner.offline.data.db.SyncStateEntity
 import com.tcgscanner.offline.data.prefs.SettingsStore
+import com.tcgscanner.offline.data.remote.BatchedSink
+import com.tcgscanner.offline.data.remote.CatalogAdapters
 import com.tcgscanner.offline.data.remote.CatalogSink
 import com.tcgscanner.offline.data.remote.CatalogSource
 import com.tcgscanner.offline.data.remote.RemoteCard
-import com.tcgscanner.offline.data.remote.SourceNotConfigured
 import com.tcgscanner.offline.data.remote.SyncProgress
-import com.tcgscanner.offline.data.remote.sources.CustomCatalogParser
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 
@@ -44,12 +44,10 @@ class CatalogRepository(
      * Rows are upserted as they stream in, so an interrupted sync still keeps what was fetched.
      */
     suspend fun sync(game: GameDef, progress: (SyncProgress) -> Unit): SyncResult {
-        val keys = settings.current().keys
         var lastError: String? = null
         var tried = false
         for (sourceId in game.sources) {
             val source = sources[sourceId] ?: continue
-            if (!source.isConfigured(keys)) continue
             tried = true
             var count = 0
             val sink = CatalogSink { batch ->
@@ -57,20 +55,18 @@ class CatalogRepository(
                 count += batch.size
             }
             try {
-                source.sync(game, keys, sink, progress)
+                source.sync(game, sink, progress)
                 if (count == 0) {
-                    lastError = "${source.id.label}: empty response"
+                    lastError = "${source.label}: empty response"
                     continue
                 }
                 val total = cards.count(game.id.code)
-                cards.putSyncState(SyncStateEntity(game.id.code, System.currentTimeMillis(), source.id.label, total, null))
+                cards.putSyncState(SyncStateEntity(game.id.code, System.currentTimeMillis(), source.label, total, null))
                 return SyncResult(game.id, true, source.id, count, null)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: SourceNotConfigured) {
-                continue
             } catch (e: Exception) {
-                lastError = "${source.id.label}: ${e.message ?: e.javaClass.simpleName}"
+                lastError = "${source.label}: ${e.message ?: e.javaClass.simpleName}"
             }
         }
         val message = lastError ?: if (tried) "No data" else "NO_SOURCE"
@@ -81,15 +77,14 @@ class CatalogRepository(
 
     /** Imports a catalog JSON document picked by the user (works fully offline). */
     suspend fun importCatalogJson(game: GameDef, text: String): Int {
-        var count = 0
-        CustomCatalogParser.parseText(text) { batch ->
-            persist(game.id, batch)
-            count += batch.size
+        val root = kotlinx.serialization.json.Json.parseToJsonElement(text)
+        val batched = BatchedSink(CatalogSink { persist(game.id, it) }, 1000)
+        CatalogAdapters.findCardObjects(root).forEach { o -> CatalogAdapters.generic(o)?.let { batched.add(it) } }
+        batched.flush()
+        if (batched.total > 0) {
+            cards.putSyncState(SyncStateEntity(game.id.code, System.currentTimeMillis(), "File", cards.count(game.id.code), null))
         }
-        if (count > 0) {
-            cards.putSyncState(SyncStateEntity(game.id.code, System.currentTimeMillis(), SourceId.CUSTOM.label, cards.count(game.id.code), null))
-        }
-        return count
+        return batched.total
     }
 
     private suspend fun persist(game: GameId, batch: List<RemoteCard>) {

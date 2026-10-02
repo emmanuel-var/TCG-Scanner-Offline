@@ -14,20 +14,15 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
-/** Optional credentials the user may paste in. They never leave the device except to the API they belong to. */
-data class ApiKeys(
-    val pokemonTcgKey: String = "",
-    val tcgplayerClientId: String = "",
-    val tcgplayerClientSecret: String = "",
-    val priceChartingToken: String = ""
-)
-
 data class AppSettings(
     val activeGames: Set<GameId> = emptySet(),
     val currentGame: GameId? = null,
     val wifiOnlySync: Boolean = true,
     val autoSync: Boolean = true,
-    val keys: ApiKeys = ApiKeys(),
+    /** Per-game override of the catalog URL; a game without an entry uses CatalogUrls.default. */
+    val catalogUrls: Map<GameId, String> = emptyMap(),
+    /** Override of the visual-model download URL; blank = the built-in default. */
+    val modelUrl: String = "",
     val nickname: String = ""
 )
 
@@ -37,12 +32,9 @@ class SettingsStore(private val context: Context) {
         val current = stringPreferencesKey("current_game")
         val wifiOnly = booleanPreferencesKey("wifi_only")
         val autoSync = booleanPreferencesKey("auto_sync")
-        val pokemonKey = stringPreferencesKey("key_pokemon_tcg")
-        val tcgId = stringPreferencesKey("key_tcgplayer_id")
-        val tcgSecret = stringPreferencesKey("key_tcgplayer_secret")
-        val pcToken = stringPreferencesKey("key_pricecharting")
         val nickname = stringPreferencesKey("nickname")
-        fun customUrl(game: GameId) = stringPreferencesKey("custom_url_${game.code}")
+        val modelUrl = stringPreferencesKey("model_url")
+        fun catalogUrl(game: GameId) = stringPreferencesKey("catalog_url_${game.code}")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p -> p.toSettings() }
@@ -52,12 +44,8 @@ class SettingsStore(private val context: Context) {
         currentGame = GameId.fromCode(this[K.current]),
         wifiOnlySync = this[K.wifiOnly] ?: true,
         autoSync = this[K.autoSync] ?: true,
-        keys = ApiKeys(
-            pokemonTcgKey = this[K.pokemonKey].orEmpty(),
-            tcgplayerClientId = this[K.tcgId].orEmpty(),
-            tcgplayerClientSecret = this[K.tcgSecret].orEmpty(),
-            priceChartingToken = this[K.pcToken].orEmpty()
-        ),
+        catalogUrls = GameId.entries.mapNotNull { g -> this[K.catalogUrl(g)]?.takeIf { it.isNotBlank() }?.let { g to it } }.toMap(),
+        modelUrl = this[K.modelUrl].orEmpty(),
         nickname = this[K.nickname].orEmpty()
     )
 
@@ -77,18 +65,20 @@ class SettingsStore(private val context: Context) {
     suspend fun setAutoSync(v: Boolean) = context.dataStore.edit { it[K.autoSync] = v }
     suspend fun setNickname(v: String) = context.dataStore.edit { it[K.nickname] = v.take(32) }
 
-    suspend fun setKeys(keys: ApiKeys) = context.dataStore.edit {
-        it[K.pokemonKey] = keys.pokemonTcgKey.trim()
-        it[K.tcgId] = keys.tcgplayerClientId.trim()
-        it[K.tcgSecret] = keys.tcgplayerClientSecret.trim()
-        it[K.pcToken] = keys.priceChartingToken.trim()
+    suspend fun setModelUrl(url: String) = context.dataStore.edit {
+        val clean = url.trim()
+        if (clean.isEmpty()) it.remove(K.modelUrl) else it[K.modelUrl] = clean
     }
 
-    fun customUrl(game: GameId): Flow<String> = context.dataStore.data.map { it[K.customUrl(game)].orEmpty() }
+    /** The user's override for [game] ("" when none). */
+    suspend fun catalogUrlOnce(game: GameId): String =
+        context.dataStore.data.map { it[K.catalogUrl(game)].orEmpty() }.first()
 
-    suspend fun customUrlOnce(game: GameId): String = customUrl(game).first()
-
-    suspend fun setCustomUrl(game: GameId, url: String) = context.dataStore.edit { it[K.customUrl(game)] = url.trim() }
+    /** Blank [url] removes the override so the game goes back to its default source. */
+    suspend fun setCatalogUrl(game: GameId, url: String) = context.dataStore.edit {
+        val clean = url.trim()
+        if (clean.isEmpty()) it.remove(K.catalogUrl(game)) else it[K.catalogUrl(game)] = clean
+    }
 
     suspend fun clearAll() = context.dataStore.edit { it.clear() }
 }
