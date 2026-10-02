@@ -106,7 +106,7 @@ Ver `docs/PLAY_STORE_CHECKLIST.md` y `docs/PRIVACY_POLICY.md`. Resumen: `targetS
 El proyecto se escribió en un entorno sin Android SDK ni acceso a Google Maven, por lo que **el APK completo no pudo compilarse allí**. Lo que sí se verificó con la JVM:
 
 * compilación de `core`, `data/remote` (todas las fuentes), entidades, valoración, parser OCR y modelos de intercambio;
-* 31 pruebas unitarias en `app/src/test` (texto, parser OCR, valoración, CSV, veredicto de intercambio, adaptadores y detección de formato, estados del modelo);
+* 33 pruebas unitarias en `app/src/test` (texto, parser OCR, valoración, CSV, veredicto de intercambio, adaptadores y detección de formato, estados del modelo);
 * pruebas adicionales de `UrlCatalogSource` y las fuentes de respaldo contra respuestas simuladas (paginación, descriptor de Scryfall, override con enlace *blob*, enlace caído).
 
 Antes de publicar: compila en Android Studio, corrige cualquier error menor de API, y prueba en dispositivo real el escáner, el arrastrar y soltar, Nearby (dos teléfonos con Google Play Services) y las fuentes con red real.
