@@ -35,7 +35,13 @@ import com.tcgscanner.offline.scanner.ModelState
  * progress indicator, Ready renders nothing (the caller also animates it away).
  */
 @Composable
-fun ModelPromptCard(state: ModelState, onDownload: () -> Unit, modifier: Modifier = Modifier) {
+fun ModelPromptCard(
+    state: ModelState,
+    onDownload: () -> Unit,
+    modifier: Modifier = Modifier,
+    @androidx.annotation.StringRes promptRes: Int = R.string.model_prompt,
+    @androidx.annotation.StringRes downloadingRes: Int = R.string.model_downloading
+) {
     if (state is ModelState.Ready) return
     Card(
         modifier = modifier
@@ -54,7 +60,7 @@ fun ModelPromptCard(state: ModelState, onDownload: () -> Unit, modifier: Modifie
                     if (progress != null) CircularProgressIndicator(progress = { progress }, modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
                     else CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
                     Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.model_downloading), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(downloadingRes), style = MaterialTheme.typography.bodyMedium)
                         if (progress != null) {
                             Text(stringResource(R.string.model_percent, (progress * 100).toInt()), style = MaterialTheme.typography.labelLarge)
                         }
@@ -65,7 +71,7 @@ fun ModelPromptCard(state: ModelState, onDownload: () -> Unit, modifier: Modifie
                     Button(onClick = onDownload) { Text(stringResource(R.string.model_retry)) }
                 }
                 else -> {
-                    Text(stringResource(R.string.model_prompt), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(promptRes), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                     Button(onClick = onDownload) { Text(stringResource(R.string.model_download)) }
                 }
             }

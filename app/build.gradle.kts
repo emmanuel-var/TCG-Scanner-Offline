@@ -114,6 +114,8 @@ dependencies {
     implementation(libs.mlkit.text.latin)
     implementation(libs.mlkit.text.japanese)
     implementation(libs.litert)
+    // PaddleOCR-Mobile models run through ONNX Runtime Mobile
+    implementation(libs.onnxruntime.android)
 
     // Offline device-to-device trading (Bluetooth / Wi-Fi, no internet required)
     implementation(libs.play.nearby)

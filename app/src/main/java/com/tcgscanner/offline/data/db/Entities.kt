@@ -15,13 +15,21 @@ import kotlinx.serialization.Serializable
  */
 @Entity(
     tableName = "card",
-    indices = [Index("gameId", "numberKey"), Index("gameId", "nameKey"), Index("gameId", "setCode")]
+    indices = [
+        // Scanner lookups: every camera query starts with the active gameId, then walks one of these B-trees.
+        Index("gameId", "setKey", "numberKey"),   // game_id + set_number + card_number  -> O(log N) exact print
+        Index("gameId", "numberKey"),
+        Index("gameId", "nameKey"),               // game_id + name (normalised)         -> O(log N) exact / prefix
+        Index("gameId", "setCode")
+    ]
 )
 @Serializable
 data class CardEntity(
     @PrimaryKey val id: String,
     val gameId: String,
     val setCode: String,
+    /** [com.tcgscanner.offline.core.CardKeys.setKey] of [setCode]: lower-case, no blanks. Indexed. */
+    val setKey: String = "",
     val setName: String,
     val setReleaseDate: String?,
     /** Printed total of the set (the "198" of "025/198"). */
@@ -168,3 +176,6 @@ data class SetCount(val code: String, val n: Int)
 data class CardQty(val cardId: String, val qty: Int)
 data class GameCardQty(val gameId: String, val cardId: String, val qty: Int)
 data class CardVariantRef(val cardId: String, val variant: String)
+
+/** The catalog row of one card print. Column mapping: game_id = gameId, set_number = setKey, card_number = numberKey, name = nameKey. */
+typealias CatalogCard = CardEntity

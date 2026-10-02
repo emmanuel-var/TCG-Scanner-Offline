@@ -1,5 +1,10 @@
-# Python 3.10 - 3.12
-tensorflow>=2.16        # CPU works; a GPU is strongly recommended for the full training run
+# Python 3.10 - 3.12. No training is involved: these scripts only convert and verify published pretrained models.
 numpy>=1.26
 pillow>=10.0
 requests>=2.31
+tensorflow>=2.16          # EfficientNet-Lite0 export + TFLite checks
+tensorflow-hub>=0.16      # EfficientNet-Lite0 feature vector (pretrained, from TF Hub / Kaggle Models)
+ultralytics>=8.3          # YOLO11n export to TFLite
+paddle2onnx>=1.2          # PaddleOCR inference model -> ONNX
+paddlepaddle>=2.6         # needed by paddle2onnx
+onnxruntime>=1.18         # sanity checks of the converted OCR models

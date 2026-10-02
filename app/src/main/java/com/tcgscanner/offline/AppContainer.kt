@@ -19,8 +19,11 @@ import com.tcgscanner.offline.data.repo.CsvExporter
 import com.tcgscanner.offline.data.repo.DeckRepository
 import com.tcgscanner.offline.data.repo.PortfolioRepository
 import com.tcgscanner.offline.data.repo.SyncCoordinator
-import com.tcgscanner.offline.scanner.ModelConfig
+import com.tcgscanner.offline.scanner.EnginePack
+import com.tcgscanner.offline.scanner.EnginePacks
 import com.tcgscanner.offline.scanner.ModelRepository
+import com.tcgscanner.offline.scanner.paddle.PaddleOcrEngine
+import com.tcgscanner.offline.scanner.pipeline.YoloCardDetector
 import com.tcgscanner.offline.scanner.ScanMatcher
 import com.tcgscanner.offline.scanner.TfliteEmbedder
 import com.tcgscanner.offline.scanner.VisualIndexer
@@ -60,8 +63,41 @@ class AppContainer(val app: Application) {
     val csv = CsvExporter(db)
     val backup = BackupRepository(db, relinker)
 
-    val embedder by lazy { TfliteEmbedder(File(app.filesDir, ModelConfig.FILE_NAME)) }
-    val models by lazy { ModelRepository(app, scope, settings, embedder) }
+    // ---- scan pipeline engines (each loads from filesDir once its pack is installed) --------------------------------
+    private val files get() = app.filesDir
+    val detector by lazy { YoloCardDetector(File(files, EnginePacks.DETECTOR_FILE)) }
+    val paddleOcr by lazy { PaddleOcrEngine(File(files, EnginePacks.OCR_DET_FILE), File(files, EnginePacks.OCR_REC_FILE), File(files, EnginePacks.OCR_DICT_FILE)) }
+    val paddleOcrJa by lazy { PaddleOcrEngine(File(files, EnginePacks.OCR_DET_FILE), File(files, EnginePacks.OCR_REC_JA_FILE), File(files, EnginePacks.OCR_DICT_JA_FILE)) }
+    val embedder by lazy { TfliteEmbedder(File(files, EnginePacks.EMBEDDER_FILE)) }
+
+    /** One repository per downloadable pack; created together so every engine reloads itself when a download ends. */
+    val packs: Map<EnginePack, ModelRepository> by lazy {
+        EnginePack.entries.associateWith { pack ->
+            ModelRepository(
+                app, scope, settings, pack,
+                onInstalled = {
+                    when (pack) {
+                        EnginePack.DETECTOR -> detector.reload()
+                        EnginePack.OCR -> paddleOcr.reload().also { if (EnginePacks.isInstalled(files, EnginePack.OCR_JA)) paddleOcrJa.reload() }
+                        EnginePack.OCR_JA -> paddleOcrJa.reload()
+                        EnginePack.EMBEDDER -> embedder.reload()
+                    }
+                },
+                onRemoved = {
+                    when (pack) {
+                        EnginePack.DETECTOR -> detector.unload()
+                        EnginePack.OCR -> { paddleOcr.unload(); paddleOcrJa.unload() }
+                        EnginePack.OCR_JA -> paddleOcrJa.unload()
+                        EnginePack.EMBEDDER -> embedder.unload()
+                    }
+                }
+            )
+        }
+    }
+
+    /** The artwork pack ("visual engine"): kept as a shortcut because the scanner gates "identify by artwork" on it. */
+    val models: ModelRepository get() = packs.getValue(EnginePack.EMBEDDER)
+
     val scanMatcher = ScanMatcher(db)
     val visualMatcher by lazy { VisualMatcher(db, embedder) }
     val indexer by lazy { VisualIndexer(scope, db, http, embedder, visualMatcher) }

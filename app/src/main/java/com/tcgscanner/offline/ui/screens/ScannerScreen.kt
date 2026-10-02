@@ -90,7 +90,9 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.tcgscanner.offline.R
 import com.tcgscanner.offline.core.GameDef
 import com.tcgscanner.offline.core.OcrScript
-import com.tcgscanner.offline.scanner.CardAnalyzer
+import com.tcgscanner.offline.scanner.MlKitOcrEngine
+import com.tcgscanner.offline.scanner.PipelineAnalyzer
+import com.tcgscanner.offline.scanner.pipeline.ScanPipeline
 import com.tcgscanner.offline.scanner.ModelState
 import com.tcgscanner.offline.ui.components.ModelPromptCard
 import androidx.compose.animation.AnimatedVisibility
@@ -115,7 +117,8 @@ fun ScannerScreen(nav: NavController) {
     val game by vm.game.collectAsStateWithLifecycle()
     val ui by vm.ui.collectAsStateWithLifecycle()
     val catalogCount by vm.catalogCount.collectAsStateWithLifecycle()
-    val modelState by vm.modelState.collectAsStateWithLifecycle()
+    val scanEngine by vm.scanEngineState.collectAsStateWithLifecycle()
+    val visualEngine by vm.visualEngineState.collectAsStateWithLifecycle()
     val identifyEnabled by vm.identifyEnabled.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val haptics = LocalHapticFeedback.current
@@ -159,8 +162,8 @@ fun ScannerScreen(nav: NavController) {
                 )
                 else -> CameraSection(
                     vm = vm, game = game!!, torch = torch, onTorchAvailable = { hasTorch = it },
-                    catalogEmpty = catalogCount == 0, liveGuess = ui.liveGuess, busy = ui.artworkBusy,
-                    modelState = modelState, identifyEnabled = identifyEnabled
+                    catalogEmpty = catalogCount == 0, ui = ui,
+                    scanEngine = scanEngine, visualEngine = visualEngine, identifyEnabled = identifyEnabled
                 )
             }
         }
@@ -216,11 +219,13 @@ private fun CameraSection(
     torch: Boolean,
     onTorchAvailable: (Boolean) -> Unit,
     catalogEmpty: Boolean,
-    liveGuess: String?,
-    busy: Boolean,
-    modelState: ModelState,
+    ui: ScannerUi,
+    scanEngine: ModelState,
+    visualEngine: ModelState,
     identifyEnabled: Boolean
 ) {
+    val liveGuess = ui.liveGuess
+    val busy = ui.artworkBusy
     val guide = remember { AtomicReference(RectF(0.1f, 0.1f, 0.9f, 0.9f)) }
     var viewSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
 
@@ -252,18 +257,43 @@ private fun CameraSection(
             drawRoundRect(line, r, s, CornerRadius(16.dp.toPx()), style = Stroke(width = 3.dp.toPx()))
         }
 
+        // Phase 1 feedback: the card outline YOLO found (after corner refinement), drawn over the live preview.
+        val outline = ui.outline
+        if (outline != null) {
+            val accent = Color(0xFF4DD58A)
+            Canvas(Modifier.fillMaxSize()) {
+                val path = Path().apply {
+                    moveTo(outline.tl.x * size.width, outline.tl.y * size.height)
+                    lineTo(outline.tr.x * size.width, outline.tr.y * size.height)
+                    lineTo(outline.br.x * size.width, outline.br.y * size.height)
+                    lineTo(outline.bl.x * size.width, outline.bl.y * size.height)
+                    close()
+                }
+                drawPath(path, accent.copy(alpha = 0.18f))
+                drawPath(path, accent, style = Stroke(width = 3.dp.toPx()))
+            }
+        }
+
         Column(
             Modifier.align(Alignment.TopCenter).padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Non-intrusive notice: the camera and OCR are already live; this only offers the optional engine.
+            // The scan engine (YOLO + PaddleOCR) is offered first; the artwork engine only once that one is in place.
             AnimatedVisibility(
-                visible = modelState !is ModelState.Ready,
+                visible = scanEngine !is ModelState.Ready,
                 enter = fadeIn() + expandVertically(),
                 exit = fadeOut() + shrinkVertically()
             ) {
-                ModelPromptCard(modelState, onDownload = vm::downloadModel)
+                ModelPromptCard(scanEngine, onDownload = vm::downloadScanEngine, promptRes = R.string.scan_engine_prompt, downloadingRes = R.string.scan_engine_downloading)
+            }
+            AnimatedVisibility(
+                visible = scanEngine is ModelState.Ready && visualEngine !is ModelState.Ready,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                ModelPromptCard(visualEngine, onDownload = vm::downloadVisualEngine)
             }
             if (catalogEmpty) {
                 Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.errorContainer) {
@@ -277,13 +307,30 @@ private fun CameraSection(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            if (ui.engine.isNotEmpty()) {
+                Surface(shape = RoundedCornerShape(12.dp), color = Color.Black.copy(alpha = 0.5f)) {
+                    Text(
+                        (if (ui.detected) "YOLO11n" else stringResource(R.string.scan_guide_mode)) + " · " + ui.engine,
+                        Modifier.padding(horizontal = 10.dp, vertical = 3.dp), color = Color.White, style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
             Surface(shape = RoundedCornerShape(24.dp), color = Color.Black.copy(alpha = 0.6f)) {
                 Text(
-                    liveGuess?.let { stringResource(R.string.scan_reading, it) } ?: stringResource(R.string.scan_hint, stringResource(game.nameRes)),
+                    when {
+                        liveGuess != null -> stringResource(R.string.scan_reading, liveGuess)
+                        ui.needsArtwork -> stringResource(R.string.scan_no_number_hint)
+                        else -> stringResource(R.string.scan_hint, stringResource(game.nameRes))
+                    },
                     Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = Color.White, textAlign = TextAlign.Center
                 )
             }
-            FilledTonalButton(onClick = vm::identifyByArtwork, enabled = identifyEnabled && !busy) {
+            val artButton: @Composable (@Composable () -> Unit) -> Unit = { content ->
+                // Phase 3 is the user's choice; when OCR keeps failing the button is promoted to the primary action.
+                if (ui.needsArtwork && identifyEnabled) androidx.compose.material3.Button(onClick = vm::identifyByArtwork, enabled = !busy) { content() }
+                else FilledTonalButton(onClick = vm::identifyByArtwork, enabled = identifyEnabled && !busy) { content() }
+            }
+            artButton {
                 if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Icon(Icons.Filled.Image, contentDescription = null)
                 Text(stringResource(R.string.identify_by_artwork), Modifier.padding(start = 8.dp))
             }
@@ -300,16 +347,25 @@ private fun CameraPreview(
     onTorchAvailable: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
+    val container = com.tcgscanner.offline.ui.LocalContainer.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
     var camera by remember { mutableStateOf<Camera?>(null) }
 
     DisposableEffect(lifecycleOwner, game.id) {
         val executor = Executors.newSingleThreadExecutor()
-        // Bundled on-device model: works with no connection at all.
-        val recognizer: TextRecognizer = when (game.ocrScript) {
-            OcrScript.JAPANESE -> TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
-            OcrScript.LATIN -> TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        // Fallback OCR bundled with the app: the camera reads text immediately, before any pack is downloaded.
+        val mlKit = MlKitOcrEngine(
+            when (game.ocrScript) {
+                OcrScript.JAPANESE -> TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
+                OcrScript.LATIN -> TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            }
+        )
+        // Hybrid pipeline: YOLO11n (if installed) -> rectified card -> PaddleOCR (if installed) else ML Kit.
+        // The engine is picked per frame, so a pack that finishes downloading takes over without restarting the camera.
+        val pipeline = ScanPipeline(container.detector) {
+            val paddle = if (game.ocrScript == OcrScript.JAPANESE) container.paddleOcrJa else container.paddleOcr
+            if (paddle.isAvailable) paddle else mlKit
         }
         val providerFuture = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null
@@ -331,7 +387,7 @@ private fun CameraPreview(
                     .build()
                 analysis.setAnalyzer(
                     executor,
-                    CardAnalyzer(recognizer, guide, vm.paused, vm.captureRequested, onLines = vm::onLines, onCapture = vm::onCapture)
+                    PipelineAnalyzer(pipeline, guide, vm.paused, onFrame = vm::onFrame)
                 )
                 val group = UseCaseGroup.Builder().addUseCase(preview).addUseCase(analysis).apply {
                     previewView.viewPort?.let { setViewPort(it) }
@@ -347,7 +403,7 @@ private fun CameraPreview(
             provider?.unbindAll()
             camera = null
             executor.shutdown()
-            recognizer.close()
+            mlKit.close()
         }
     }
 

@@ -62,7 +62,8 @@ import com.tcgscanner.offline.core.GameId
 import com.tcgscanner.offline.core.Games
 import com.tcgscanner.offline.data.remote.CatalogUrls
 import com.tcgscanner.offline.data.remote.UrlNormalizer
-import com.tcgscanner.offline.scanner.ModelConfig
+import com.tcgscanner.offline.scanner.EnginePack
+import com.tcgscanner.offline.scanner.EnginePacks
 import com.tcgscanner.offline.scanner.ModelState
 import com.tcgscanner.offline.work.SyncScheduler
 import com.tcgscanner.offline.data.prefs.AppSettings
@@ -126,14 +127,19 @@ class SettingsViewModel(private val c: AppContainer) : ViewModel() {
         return null
     }
 
-    // ---- visual engine ---------------------------------------------------------------------------------
-    val model: StateFlow<ModelState> get() = c.models.state
-    fun downloadModel() = c.models.download()
-    fun deleteModel() = c.models.delete()
-    fun saveModelUrl(raw: String): Int? {
+    // ---- scan engine packs -----------------------------------------------------------------------------
+    /** State of every downloadable pack (YOLO detector, PaddleOCR, Japanese OCR, EfficientNet-Lite0). */
+    val packStates: StateFlow<Map<EnginePack, ModelState>> = kotlinx.coroutines.flow.combine(
+        EnginePack.entries.map { pack -> c.packs.getValue(pack).state }
+    ) { states -> EnginePack.entries.zip(states.toList()).toMap() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    fun downloadPack(pack: EnginePack) = c.packs.getValue(pack).download()
+    fun deletePack(pack: EnginePack) = c.packs.getValue(pack).delete()
+    fun saveModelBaseUrl(raw: String): Int? {
         val clean = raw.trim()
         if (clean.isNotEmpty() && !UrlNormalizer.isValid(clean)) return R.string.catalog_url_invalid
-        viewModelScope.launch { c.settings.setModelUrl(UrlNormalizer.normalize(clean)); _messages.emit(R.string.saved) }
+        viewModelScope.launch { c.settings.setModelBaseUrl(UrlNormalizer.normalize(clean)); _messages.emit(R.string.saved) }
         return null
     }
 
@@ -218,7 +224,7 @@ fun SettingsScreen(nav: NavController, onBack: () -> Unit) {
     var nickname by remember(s.nickname) { mutableStateOf(s.nickname) }
     var confirmErase by remember { mutableStateOf(false) }
     var confirmRestore by remember { mutableStateOf(false) }
-    val model by vm.model.collectAsStateWithLifecycle()
+    val packStates by vm.packStates.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -341,36 +347,27 @@ fun SettingsScreen(nav: NavController, onBack: () -> Unit) {
                 if (s.activeGames.isEmpty()) Text(stringResource(R.string.hub_empty_message), style = MaterialTheme.typography.bodyMedium)
             }
 
-            // ---- Visual engine (optional TensorFlow Lite model) ----------------------------------------------
-            Section(stringResource(R.string.section_visual_engine)) {
-                Text(stringResource(R.string.visual_engine_explainer, ModelConfig.APPROX_SIZE_MB), style = MaterialTheme.typography.bodyMedium)
-                when (val m = model) {
-                    is ModelState.Ready -> {
-                        Text(stringResource(R.string.model_ready), style = MaterialTheme.typography.titleMedium)
-                        OutlinedButton(onClick = vm::deleteModel) { Text(stringResource(R.string.model_delete)) }
-                    }
-                    is ModelState.Downloading -> {
-                        val p = m.progress
-                        if (p != null) LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
-                        else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        Text(stringResource(R.string.model_downloading), style = MaterialTheme.typography.bodyMedium)
-                    }
-                    is ModelState.Failed -> {
-                        Text(stringResource(R.string.model_failed), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-                        Button(onClick = vm::downloadModel) { Text(stringResource(R.string.model_retry)) }
-                    }
-                    is ModelState.Missing -> Button(onClick = vm::downloadModel) { Text(stringResource(R.string.model_download)) }
+            // ---- Scan engine packs (YOLO11n + PaddleOCR + EfficientNet-Lite0) -----------------------------------------
+            Section(stringResource(R.string.section_scan_engine)) {
+                Text(stringResource(R.string.scan_engine_explainer), style = MaterialTheme.typography.bodyMedium)
+                EnginePack.entries.forEach { pack ->
+                    PackRow(
+                        pack = pack,
+                        state = packStates[pack] ?: ModelState.Missing,
+                        onDownload = { vm.downloadPack(pack) },
+                        onDelete = { vm.deletePack(pack) }
+                    )
                 }
-                var modelUrl by remember(s.modelUrl) { mutableStateOf(s.modelUrl) }
-                var modelUrlError by remember { mutableStateOf<Int?>(null) }
+                var base by remember(s.modelBaseUrl) { mutableStateOf(s.modelBaseUrl) }
+                var baseError by remember { mutableStateOf<Int?>(null) }
                 OutlinedTextField(
-                    modelUrl, { modelUrl = it.take(400); modelUrlError = null }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    base, { base = it.take(400); baseError = null }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.model_url_label)) },
-                    placeholder = { Text(ModelConfig.DEFAULT_URL) },
-                    isError = modelUrlError != null,
-                    supportingText = { modelUrlError?.let { Text(stringResource(it)) } }
+                    placeholder = { Text(EnginePacks.DEFAULT_BASE_URL) },
+                    isError = baseError != null,
+                    supportingText = { baseError?.let { Text(stringResource(it)) } }
                 )
-                OutlinedButton(onClick = { modelUrlError = vm.saveModelUrl(modelUrl) }, enabled = modelUrl != s.modelUrl) { Text(stringResource(R.string.save)) }
+                OutlinedButton(onClick = { baseError = vm.saveModelBaseUrl(base) }, enabled = base != s.modelBaseUrl) { Text(stringResource(R.string.save)) }
             }
 
             // ---- About / data ---------------------------------------------------------------------------------
@@ -462,5 +459,37 @@ private fun CatalogUrlRow(
             TextButton(onClick = { text = ""; error = onSave("") }, enabled = saved.isNotEmpty()) { Text(stringResource(R.string.catalog_url_reset)) }
             TextButton(onClick = onSyncNow, enabled = !busy) { Text(stringResource(R.string.catalog_url_sync)) }
         }
+    }
+}
+
+@Composable
+private fun PackRow(pack: EnginePack, state: ModelState, onDownload: () -> Unit, onDelete: () -> Unit) {
+    val name = stringResource(
+        when (pack) {
+            EnginePack.DETECTOR -> R.string.pack_detector_name
+            EnginePack.OCR -> R.string.pack_ocr_name
+            EnginePack.OCR_JA -> R.string.pack_ocr_ja_name
+            EnginePack.EMBEDDER -> R.string.pack_embedder_name
+        }
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(name, style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.pack_size_mb, EnginePacks.approxMb(pack)), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            when (state) {
+                is ModelState.Ready -> OutlinedButton(onClick = onDelete) { Text(stringResource(R.string.model_delete)) }
+                is ModelState.Downloading -> Text(state.progress?.let { stringResource(R.string.model_percent, (it * 100).toInt()) } ?: stringResource(R.string.model_downloading))
+                is ModelState.Failed -> Button(onClick = onDownload) { Text(stringResource(R.string.model_retry)) }
+                is ModelState.Missing -> Button(onClick = onDownload) { Text(stringResource(R.string.model_download)) }
+            }
+        }
+        if (state is ModelState.Downloading) {
+            val p = state.progress
+            if (p != null) LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+        if (state is ModelState.Failed) Text(stringResource(R.string.model_failed), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+        if (state is ModelState.Ready) Text(stringResource(R.string.model_ready), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
     }
 }

@@ -21,8 +21,8 @@ data class AppSettings(
     val autoSync: Boolean = true,
     /** Per-game override of the catalog URL; a game without an entry uses CatalogUrls.default. */
     val catalogUrls: Map<GameId, String> = emptyMap(),
-    /** Override of the visual-model download URL; blank = the built-in default. */
-    val modelUrl: String = "",
+    /** Folder URL the engine packs are downloaded from; blank = EnginePacks.DEFAULT_BASE_URL. */
+    val modelBaseUrl: String = "",
     val nickname: String = ""
 )
 
@@ -33,7 +33,7 @@ class SettingsStore(private val context: Context) {
         val wifiOnly = booleanPreferencesKey("wifi_only")
         val autoSync = booleanPreferencesKey("auto_sync")
         val nickname = stringPreferencesKey("nickname")
-        val modelUrl = stringPreferencesKey("model_url")
+        val modelBaseUrl = stringPreferencesKey("model_base_url")
         fun catalogUrl(game: GameId) = stringPreferencesKey("catalog_url_${game.code}")
     }
 
@@ -45,7 +45,7 @@ class SettingsStore(private val context: Context) {
         wifiOnlySync = this[K.wifiOnly] ?: true,
         autoSync = this[K.autoSync] ?: true,
         catalogUrls = GameId.entries.mapNotNull { g -> this[K.catalogUrl(g)]?.takeIf { it.isNotBlank() }?.let { g to it } }.toMap(),
-        modelUrl = this[K.modelUrl].orEmpty(),
+        modelBaseUrl = this[K.modelBaseUrl].orEmpty(),
         nickname = this[K.nickname].orEmpty()
     )
 
@@ -65,9 +65,9 @@ class SettingsStore(private val context: Context) {
     suspend fun setAutoSync(v: Boolean) = context.dataStore.edit { it[K.autoSync] = v }
     suspend fun setNickname(v: String) = context.dataStore.edit { it[K.nickname] = v.take(32) }
 
-    suspend fun setModelUrl(url: String) = context.dataStore.edit {
+    suspend fun setModelBaseUrl(url: String) = context.dataStore.edit {
         val clean = url.trim()
-        if (clean.isEmpty()) it.remove(K.modelUrl) else it[K.modelUrl] = clean
+        if (clean.isEmpty()) it.remove(K.modelBaseUrl) else it[K.modelBaseUrl] = clean
     }
 
     /** The user's override for [game] ("" when none). */

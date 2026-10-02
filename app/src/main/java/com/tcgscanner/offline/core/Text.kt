@@ -23,6 +23,10 @@ object Text {
     fun numberKey(s: String): String =
         s.trim().lowercase(Locale.ROOT).replace(Regex("[\\s_]+"), "").replace(zeroRun, "")
 
+    /** Smallest string greater than every string starting with [prefix]: bounds a `>= lo AND < hi` index range scan. */
+    fun prefixUpperBound(prefix: String): String =
+        if (prefix.isEmpty()) "\uffff" else prefix.dropLast(1) + (prefix.last() + 1)
+
     fun levenshtein(a: String, b: String): Int {
         if (a == b) return 0
         if (a.isEmpty()) return b.length

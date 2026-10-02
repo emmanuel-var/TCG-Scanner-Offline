@@ -1,58 +1,37 @@
-# Card artwork embedder: training and export
+# Models for the on-device scan pipeline (no training)
 
-Produces `card_embedder.tflite`, the optional visual engine the app downloads from Settings / the scanner screen.
+The app reads cards with a hybrid pipeline; every model is a **pretrained, off-the-shelf network that is only converted**:
+
+| Phase | Model | Script | Pack files |
+|---|---|---|---|
+| 1. isolate the card | YOLO11n / YOLOv8n **card detector** (TFLite) | `export_yolo_card_detector.py` | `card_detector.tflite` |
+| 2. read the set code | PaddleOCR-Mobile (ONNX) | `prepare_ocr_pack.py` | `ocr_det.onnx`, `ocr_rec.onnx`, `ocr_dict.txt` (+ `ocr_rec_japan.onnx`, `ocr_dict_japan.txt`) |
+| 3. artwork fallback | EfficientNet-Lite0 feature vector (TFLite) | `export_efficientnet_lite0.py` | `card_embedder.tflite` |
+
+The previous embedding-training script was removed: nothing here is fine-tuned for recognising cards. The only model that
+needs task data is the YOLO **detector**, which answers "where is a card?" and is a standard one-class detection job (see the
+header of `export_yolo_card_detector.py`); the rest are published weights.
 
 ```
 pip install -r requirements.txt
-
-# 1. reference images: one clean image per card (any JSON catalog works, see --help)
-python fetch_images.py --catalog https://api.scryfall.com/bulk-data/default-cards --game mtg --out images --limit 20000
-
-# 2. train + export + evaluate (GPU recommended; defaults: 224 px, 128-d, fp16)
-python train_card_embedder.py --images images --out build --min-top1 0.9
-
-# 3. publish
-#    - attach build/card_embedder.tflite to a GitHub release
-#    - ModelConfig.DEFAULT_URL = that asset URL, ModelConfig.SHA256 = contents of build/card_embedder.sha256
+python export_yolo_card_detector.py --weights card_detector.pt --out build --check some_photo.jpg
+python prepare_ocr_pack.py --out build --japanese
+python export_efficientnet_lite0.py --out build
+python release_checksums.py build/
 ```
 
-Train one model for all games: put every game's images under `images/` (sub-folders are fine). The model learns
-general "same card under camera conditions" similarity, so it also helps games it has not seen, but recall is best for
-the cards it was trained on. Re-run when many new sets are released.
+Publish: upload the files of `build/` to a GitHub release (default tag `models-v1`, see `EnginePacks.DEFAULT_BASE_URL`), or to
+any https folder and paste that folder in Settings -> Scan engine. Optionally put the printed SHA-256 values into the
+`PackFile` entries of `EnginePacks.kt` so downloads are verified.
 
-## How it works
+## Contracts the Kotlin code relies on
 
-* **Task**: each card is a class with a single clean reference image. Every training step generates new camera-like
-  augmentations (perspective tilt, rotation, zoom, glare band, blur, noise, colour and JPEG artefacts) and trains a
-  MobileNetV2 + 128-d embedding with a CosFace cosine-margin head. The head is dropped at export.
-* **Evaluation** (`metrics.json`): the exported `.tflite` embeds all references; strongly augmented queries (stronger
-  than training) must retrieve their own card. Reports top-1 / top-5. Use `--min-top1` to fail a bad run in CI.
-* **Size**: fp16 MobileNetV2 + dense is about 4.5 MB; the app's UI text says 15 MB so there is headroom for a larger
-  backbone or `--embedding-dim`.
+* **Detector** `[1,S,S,3]` RGB 0..1 -> `[1,4+classes,anchors]` (or transposed), boxes normalised or in pixels; best class
+  score = confidence (`YoloDecoder`). Letterboxed with grey 114 padding. Export with `format=tflite`; int8 exports are not supported.
+* **PaddleOCR** detector `[N,3,H,W]` (BGR, ImageNet mean/std) -> probability map; recogniser `[N,3,48,W]` (BGR, `(x/255-.5)/.5`) ->
+  `[N,T,classes]` with `classes = dictionary lines + 2` (CTC blank first, space last). `prepare_ocr_pack.py` verifies this.
+* **EfficientNet-Lite0** `[1,224,224,3]` RGB in [-1,1] (the artwork window of the card, `VisualSignature.artCrop`) -> `[1,1280]`, L2-normalised.
 
-## Contract with the Android app
-
-| | |
-|---|---|
-| input | `float32 [1, S, S, 3]`, RGB, `pixel / 127.5 - 1` |
-| crop | artwork window x 8–92 %, y 12–58 % of the card, squashed to S×S (`VisualSignature.artCrop`) |
-| output | `float32 [1, D]`, L2-normalised |
-
-`ART_BOX` in the script must equal `VisualSignature.X0/X1/Y0/Y1`. S and D are read from the model by
-`TfliteEmbedder`, so you can change `--image-size` / `--embedding-dim` without touching Kotlin.
-
-`reference_embeddings.f16` + `labels.json` are also written: they allow shipping precomputed reference vectors in a
-future app version instead of downloading card images on the phone to build the artwork index.
-
-## Smoke test without internet or ImageNet weights
-
-```
-python train_card_embedder.py --images images --out build --weights none --image-size 96 \
-    --embedding-dim 32 --epochs-warmup 1 --epochs-finetune 1 --max-classes 200
-```
-
-Without ImageNet weights accuracy is poor by design; this only checks the pipeline end to end. From-scratch runs
-recalibrate BatchNorm statistics before export (otherwise inference mode would not match training mode); with
-ImageNet weights BatchNorm stays frozen in inference mode throughout. Tune `--aug-strength`, `--cosface-scale`,
-`--cosface-margin`, `--head-lr` and `--finetune-lr` for your data; if `--weights imagenet` cannot download, the script
-falls back to training from scratch and says so.
+Status: the Keras path of `export_efficientnet_lite0.py` was run end to end here (TensorFlow 2.21, random weights, because the
+model hubs are unreachable from the build sandbox); the TF Hub path, the YOLO export and the PaddleOCR conversion are written
+against the public tools but **were not executed**: run them once and check the printed shapes before publishing.

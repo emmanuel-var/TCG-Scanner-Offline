@@ -16,6 +16,7 @@ class TcgApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        container.packs // create the pack repositories now so installed engines load without opening Settings
         // Keep the daily price sync in line with the user's preferences.
         container.scope.launch {
             container.settingsState.filterNotNull()

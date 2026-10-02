@@ -13,7 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DeckEntity::class, DeckCardEntity::class, PortfolioSnapshotEntity::class, SyncStateEntity::class,
         CardSignatureEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -54,9 +54,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v2 -> v3: normalised set key + the composite (gameId, setKey, numberKey) index used by the scanner. */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE card ADD COLUMN setKey TEXT NOT NULL DEFAULT ''")
+                db.execSQL("UPDATE card SET setKey = lower(replace(replace(trim(setCode), ' ', ''), char(9), ''))")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_card_gameId_setKey_numberKey ON card (gameId, setKey, numberKey)")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "tcg_scanner.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }

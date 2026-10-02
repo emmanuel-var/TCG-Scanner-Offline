@@ -11,8 +11,8 @@ import java.nio.channels.FileChannel
 import kotlin.math.sqrt
 
 /**
- * Optional on-device image embedder (e.g. a MobileNetV2 feature extractor). The model is NOT bundled in the
- * APK: it is downloaded on demand into filesDir ([ModelConfig.FILE_NAME]). Until it is there, everything
+ * Phase 3 of the pipeline: optional on-device image embedder, EfficientNet-Lite0 feature vector (any [1,H,W,3] -> [1,D] TFLite model works). The model is NOT bundled in the
+ * APK: it is downloaded on demand into filesDir ([EnginePacks.EMBEDDER_FILE]). Until it is there, everything
  * returns null and the scanner keeps working with OCR and perceptual hashes. See docs/SCANNER_MODEL.md.
  */
 class TfliteEmbedder(private val modelFile: File) {

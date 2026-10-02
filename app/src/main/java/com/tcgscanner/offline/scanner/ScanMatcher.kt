@@ -8,7 +8,17 @@ import com.tcgscanner.offline.data.db.CardWithPrices
 
 data class ScanMatch(val card: CardWithPrices, val score: Double)
 
-/** Resolves OCR output against the local Room catalog of the active game only (fast, fully offline). */
+/**
+ * Resolves OCR output against the local Room catalog of the ACTIVE game only.
+ *
+ * Every query starts with `gameId = ?` and then walks a B-tree index, so a lookup is O(log N) however large
+ * the catalog is:
+ *  1. set + number   -> index (gameId, setKey, numberKey)           exact print
+ *  2. number only    -> index (gameId, numberKey)
+ *  3. exact name     -> index (gameId, nameKey)
+ *  4. name prefix    -> range scan on (gameId, nameKey)
+ * The only unindexed query (name CONTAINS) is a last resort used when nothing above produced a candidate.
+ */
 class ScanMatcher(private val db: AppDatabase) {
 
     suspend fun match(game: GameId, parsed: ParsedCard, limit: Int = 8): List<ScanMatch> {
@@ -19,7 +29,12 @@ class ScanMatcher(private val db: AppDatabase) {
         val totalHits = HashSet<String>()
 
         for (hint in parsed.numbers) {
-            for (c in dao.findByNumberKey(game.code, hint.key)) {
+            val found = if (hint.setKey != null) {
+                dao.findBySetAndNumber(game.code, hint.setKey, hint.key).ifEmpty { dao.findByNumberKey(game.code, hint.key) }
+            } else {
+                dao.findByNumberKey(game.code, hint.key)
+            }
+            for (c in found) {
                 candidates.putIfAbsent(c.id, c)
                 numberHits.add(c.id)
                 if (hint.total != null && c.setTotal == hint.total) totalHits.add(c.id)
@@ -27,19 +42,22 @@ class ScanMatcher(private val db: AppDatabase) {
         }
 
         val lineKeys = parsed.names.map { Text.nameKey(it) }.filter { it.length >= 3 }
-        val needles = LinkedHashSet<String>()
-        for (line in parsed.names.take(4)) {
-            val key = Text.nameKey(line)
-            if (key.length >= 3) needles.add(key)
-            line.split(' ').map { Text.nameKey(it) }.filter { it.length >= 4 }.forEach { needles.add(it) }
-        }
-        for (needle in needles.take(8)) {
-            var found = dao.findByNameContaining(game.code, needle, 300)
-            if (found.isEmpty() && needle.length >= 7) {
-                // OCR slips inside a long name: try its stable ends.
-                found = dao.findByNameContaining(game.code, needle.take(4), 300) + dao.findByNameContaining(game.code, needle.takeLast(4), 300)
+        for (key in lineKeys.take(4)) {
+            dao.findByNameKey(game.code, key).forEach { candidates.putIfAbsent(it.id, it) }
+            if (key.length >= 4) {
+                for (len in intArrayOf(minOf(key.length, 8), 4).distinct()) {
+                    val prefix = key.take(len)
+                    dao.findByNameRange(game.code, prefix, Text.prefixUpperBound(prefix), 200).forEach { candidates.putIfAbsent(it.id, it) }
+                }
             }
-            found.forEach { candidates.putIfAbsent(it.id, it) }
+        }
+        if (candidates.isEmpty()) {
+            // Unindexed fallback, only for badly misread names.
+            for (line in parsed.names.take(3)) {
+                line.split(' ').map { Text.nameKey(it) }.filter { it.length >= 4 }.take(2).forEach { token ->
+                    dao.findByNameContaining(game.code, token, 200).forEach { candidates.putIfAbsent(it.id, it) }
+                }
+            }
         }
 
         val scored = candidates.values.map { c ->

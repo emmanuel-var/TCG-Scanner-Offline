@@ -1,27 +1,5 @@
 package com.tcgscanner.offline.scanner
 
-/** Static settings of the optional on-device visual model (TensorFlow Lite artwork embedder). */
-object ModelConfig {
-    /** Lives in Context.filesDir, so it is app-private, survives updates and needs no storage permission. */
-    const val FILE_NAME = "card_embedder.tflite"
-
-    /**
-     * Public location of the model: attach `card_embedder.tflite` to a GitHub release of this project.
-     * Users can override it in Settings, so a moved or renamed release never bricks the feature.
-     */
-    const val DEFAULT_URL = "https://github.com/emmanuel-var/TCG-Scanner-Offline/releases/download/models-v1/card_embedder.tflite"
-
-    const val APPROX_SIZE_MB = 15
-
-    /** Anything smaller than this is an error page or a truncated download, not a model. */
-    const val MIN_BYTES = 1_000_000L
-
-    /** Lower-case hex SHA-256 of the published model. When non-empty the download is verified against it. */
-    const val SHA256 = ""
-
-    const val WORK_NAME = "model_download"
-}
-
 /** What the scanner UI needs to know about the model. Rendered reactively from a StateFlow. */
 sealed interface ModelState {
     data object Missing : ModelState
@@ -48,4 +26,23 @@ object ModelStateResolver {
         work == ModelWork.FAILED || error != null -> ModelState.Failed(error)
         else -> ModelState.Missing
     }
+}
+
+/** Folds the states of several packs into the one the UI shows ("scan engine" = detector + OCR). */
+fun aggregateModelStates(states: List<ModelState>): ModelState = when {
+    states.isEmpty() -> ModelState.Ready
+    states.any { it is ModelState.Downloading } -> {
+        val parts = states.map { st ->
+            when (st) {
+                is ModelState.Downloading -> st.progress
+                ModelState.Ready -> 1f
+                else -> 0f
+            }
+        }
+        val known = states.none { it is ModelState.Downloading && it.progress == null }
+        ModelState.Downloading(if (known) parts.map { it ?: 0f }.average().toFloat() else null)
+    }
+    states.all { it == ModelState.Ready } -> ModelState.Ready
+    states.any { it is ModelState.Failed } -> states.filterIsInstance<ModelState.Failed>().first()
+    else -> ModelState.Missing
 }

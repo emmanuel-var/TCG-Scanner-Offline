@@ -55,4 +55,35 @@ class TextAndParserTest {
         val parsed = CardTextParser.parse(listOf(OcrLine("12", 0.1f, 0.02f), OcrLine("Basic", 0.1f, 0.02f)), Games[GameId.MTG])
         assertTrue(parsed.names.isEmpty())
     }
+
+    @Test fun onePieceRegexReadsTheSetPrefixAndRepairsOcrDigits() {
+        val parsed = CardTextParser.parse(listOf(OcrLine("0P01-O25", 0.9f, 0.03f), OcrLine("Roronoa Zoro", 0.1f, 0.05f)), Games[GameId.ONE_PIECE])
+        // "0P01" starts with a zero-for-O confusion; the clean "OP01-O25" form must still be recovered.
+        val hints = CardTextParser.parse(listOf(OcrLine("OP01-O25", 0.9f, 0.03f)), Games[GameId.ONE_PIECE]).numbers
+        assertEquals("op1-25", hints.single().key)
+        assertEquals("op01", hints.single().setKey)
+        assertTrue(parsed.names.contains("Roronoa Zoro"))
+    }
+
+    @Test fun eachGameHasItsOwnCodePattern() {
+        fun key(game: GameId, text: String) = CardTextParser.parse(listOf(OcrLine(text, 0.9f, 0.03f)), Games[game]).numbers.firstOrNull()?.key
+        assertEquals("fb1-1", key(GameId.DBS_FW, "FB01-001"))
+        assertEquals("gd1-1", key(GameId.GUNDAM, "GD01-001"))
+        assertEquals("bt1-10", key(GameId.DIGIMON, "BT1-010"))
+        assertEquals("ex2-45", key(GameId.DIGIMON, "EX2-045"))
+        assertEquals("lob-en5", key(GameId.YGO, "LOB-EN005"))
+        assertEquals("lob-en5", key(GameId.YGO, "LOB-ENO05"))      // O read instead of 0
+        assertEquals("25", key(GameId.POKEMON, "O25/198"))
+        assertEquals("123", key(GameId.LORCANA, "123/204"))
+    }
+
+    @Test fun setKeyMatchesTheRoomColumnConvention() {
+        val hint = CardTextParser.parse(listOf(OcrLine("LOB-EN005", 0.9f, 0.03f)), Games[GameId.YGO]).numbers.single()
+        assertEquals(com.tcgscanner.offline.core.CardKeys.setKey("LOB"), hint.setKey)
+    }
+
+    @Test fun noPatternNoNumber() {
+        val parsed = CardTextParser.parse(listOf(OcrLine("Cost 3  Power 5000", 0.5f, 0.03f)), Games[GameId.ONE_PIECE])
+        assertTrue(parsed.numbers.isEmpty() && !parsed.hasNumber)
+    }
 }

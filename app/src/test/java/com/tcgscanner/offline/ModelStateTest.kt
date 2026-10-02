@@ -37,4 +37,27 @@ class ModelStateTest {
     @Test fun retryingAfterFailureShowsProgressAgain() {
         assertEquals(ModelState.Downloading(null), resolve(ModelWork.QUEUED, null, false, "HTTP 500"))
     }
+
+    @Test fun aggregatesPacksIntoOneState() {
+        val agg = com.tcgscanner.offline.scanner.aggregateModelStates(listOf(ModelState.Ready, ModelState.Ready))
+        assertEquals(ModelState.Ready, agg)
+        assertEquals(ModelState.Missing, com.tcgscanner.offline.scanner.aggregateModelStates(listOf(ModelState.Ready, ModelState.Missing)))
+        assertEquals(
+            ModelState.Downloading(0.5f),
+            com.tcgscanner.offline.scanner.aggregateModelStates(listOf(ModelState.Ready, ModelState.Downloading(0f)))
+        )
+        assertEquals(
+            ModelState.Downloading(null),
+            com.tcgscanner.offline.scanner.aggregateModelStates(listOf(ModelState.Downloading(null), ModelState.Ready))
+        )
+        assertEquals(ModelState.Failed("x"), com.tcgscanner.offline.scanner.aggregateModelStates(listOf(ModelState.Ready, ModelState.Failed("x"))))
+    }
+
+    @Test fun packFilesAndUrls() {
+        val ocr = com.tcgscanner.offline.scanner.EnginePacks.files(com.tcgscanner.offline.scanner.EnginePack.OCR).map { it.name }
+        assertEquals(listOf("ocr_det.onnx", "ocr_rec.onnx", "ocr_dict.txt"), ocr)
+        val f = com.tcgscanner.offline.scanner.EnginePacks.files(com.tcgscanner.offline.scanner.EnginePack.DETECTOR).single()
+        assertEquals("https://example.com/m/card_detector.tflite", com.tcgscanner.offline.scanner.EnginePacks.urlFor("https://example.com/m", f))
+        assertEquals(com.tcgscanner.offline.scanner.EnginePacks.DEFAULT_BASE_URL + "card_detector.tflite", com.tcgscanner.offline.scanner.EnginePacks.urlFor("", f))
+    }
 }

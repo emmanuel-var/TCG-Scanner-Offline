@@ -36,8 +36,18 @@ interface CardDao {
     @Query("SELECT * FROM card WHERE id IN (:ids)")
     suspend fun getManyWithPrices(ids: List<String>): List<CardWithPrices>
 
+    // ---- scanner lookups: all start with gameId, all hit an index (see CardEntity) ------------------------------
+
+    /** Exact print by set + number: composite index (gameId, setKey, numberKey). */
+    @Query("SELECT * FROM card WHERE gameId = :game AND setKey = :setKey AND numberKey = :key LIMIT 20")
+    suspend fun findBySetAndNumber(game: String, setKey: String, key: String): List<CardEntity>
+
     @Query("SELECT * FROM card WHERE gameId = :game AND numberKey = :key LIMIT 400")
     suspend fun findByNumberKey(game: String, key: String): List<CardEntity>
+
+    /** Names starting with a prefix: a range scan on index (gameId, nameKey). [hi] is the prefix with its last char + 1. */
+    @Query("SELECT * FROM card WHERE gameId = :game AND nameKey >= :lo AND nameKey < :hi LIMIT :limit")
+    suspend fun findByNameRange(game: String, lo: String, hi: String, limit: Int): List<CardEntity>
 
     @Query("SELECT * FROM card WHERE gameId = :game AND nameKey LIKE '%' || :needle || '%' LIMIT :limit")
     suspend fun findByNameContaining(game: String, needle: String, limit: Int): List<CardEntity>

@@ -98,40 +98,52 @@ class VisualIndexer(
     }
 }
 
-/** Nearest-neighbour search over the stored signatures of one game. */
+/**
+ * Nearest-neighbour search over the reference signatures of one game, served ENTIRELY from RAM.
+ *
+ * [prepare] reads the game's embeddings from Room ONCE (the ScannerViewModel calls it when it starts for a game)
+ * and builds a [VectorIndex]; [identify] then only does dot products over memory, never a SQLite query.
+ */
 class VisualMatcher(private val db: AppDatabase, private val embedder: TfliteEmbedder) {
-    private class Entry(val cardId: String, val sig: Signature, val embedding: FloatArray?)
+    private class HashEntry(val cardId: String, val sig: Signature)
+    private class GameIndex(val vectors: VectorIndex, val hashes: List<HashEntry>)
 
-    private val cache = HashMap<GameId, List<Entry>>()
+    private val cache = java.util.concurrent.ConcurrentHashMap<GameId, GameIndex>()
+
+    /** Bumped on every invalidation so collectors (the scanner) can reload their game. */
+    private val _invalidations = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val invalidations: StateFlow<Int> = _invalidations.asStateFlow()
 
     fun invalidate(game: GameId) {
-        synchronized(cache) { cache.remove(game) }
+        cache.remove(game)
+        _invalidations.value++
     }
 
-    private suspend fun entries(game: GameId): List<Entry> {
-        synchronized(cache) { cache[game] }?.let { return it }
-        val loaded = db.cards().signatures(game.code)
-            .filter { it.dHash != 0L || it.aHash != 0L }
-            .map { Entry(it.cardId, Signature(it.dHash, it.aHash), it.embedding?.let(TfliteEmbedder::fromBytes)) }
-        synchronized(cache) { cache[game] = loaded }
-        return loaded
+    /** Loads [game]'s embeddings into RAM (no-op if already there). Returns how many cards are indexed. */
+    suspend fun prepare(game: GameId): Int = withContext(Dispatchers.Default) {
+        index(game).vectors.size.coerceAtLeast(index(game).hashes.size)
     }
 
-    suspend fun indexedCount(game: GameId): Int = entries(game).size
+    private suspend fun index(game: GameId): GameIndex {
+        cache[game]?.let { return it }
+        val rows = db.cards().signatures(game.code)
+        val vectors = VectorIndex.build(
+            rows.filter { it.embedding != null }.map { it.cardId to TfliteEmbedder.fromBytes(it.embedding!!) }
+        )
+        val hashes = rows.filter { it.dHash != 0L || it.aHash != 0L }.map { HashEntry(it.cardId, Signature(it.dHash, it.aHash)) }
+        return GameIndex(vectors, hashes).also { cache[game] = it }
+    }
 
+    /** @param card the rectified, upright card image from the pipeline. */
     suspend fun identify(game: GameId, card: Bitmap, limit: Int = 5): List<VisualMatch> = withContext(Dispatchers.Default) {
-        val all = entries(game)
-        if (all.isEmpty()) return@withContext emptyList()
+        val idx = index(game)
         val query = embedder.embed(card)
-        if (query != null && all.any { it.embedding != null }) {
-            return@withContext all.filter { it.embedding != null }
-                .map { VisualMatch(it.cardId, 0, TfliteEmbedder.cosine(query, it.embedding!!)) }
-                .sortedByDescending { it.cosine }
-                .take(limit)
+        if (query != null && idx.vectors.size > 0) {
+            val hits = idx.vectors.topK(query, limit)
+            if (hits.isNotEmpty()) return@withContext hits.map { VisualMatch(it.id, 0, it.score) }
         }
+        if (idx.hashes.isEmpty()) return@withContext emptyList()
         val sig = VisualSignature.compute(card)
-        all.map { VisualMatch(it.cardId, VisualSignature.distance(sig, it.sig), null) }
-            .sortedBy { it.distance }
-            .take(limit)
+        idx.hashes.map { VisualMatch(it.cardId, VisualSignature.distance(sig, it.sig), null) }.sortedBy { it.distance }.take(limit)
     }
 }
