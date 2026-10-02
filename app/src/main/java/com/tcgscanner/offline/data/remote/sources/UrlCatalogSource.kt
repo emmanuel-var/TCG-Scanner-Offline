@@ -22,6 +22,7 @@ import com.tcgscanner.offline.data.remote.s
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.ResponseBody
@@ -58,11 +59,15 @@ class UrlCatalogSource(
             pokemonPaged(parsed, batched, progress)
         } else {
             var next: String? = url
+            var forced: CatalogFormat? = null
             var hops = 0
             while (next != null) {
                 require(hops++ < 3) { "Too many redirects between catalog descriptors" }
                 progress(SyncProgress("${parsed.host} · downloading"))
-                next = fetchOnce(next, batched, progress)
+                val following = fetchOnce(next, batched, progress, forced)
+                // The file a Scryfall descriptor points to is the cards array itself: read it as such, no sniffing.
+                forced = if (following != null) CatalogFormat.SCRYFALL_CARDS else null
+                next = following
             }
         }
         batched.flush()
@@ -70,11 +75,11 @@ class UrlCatalogSource(
     }
 
     /** Returns another URL to follow (Scryfall's bulk descriptor), or null once cards were read. */
-    private suspend fun fetchOnce(url: String, out: BatchedSink, progress: (SyncProgress) -> Unit): String? =
+    private suspend fun fetchOnce(url: String, out: BatchedSink, progress: (SyncProgress) -> Unit, forced: CatalogFormat? = null): String? =
         http.getWithRetry(url, attempts = 3) { body ->
             val head = peekHead(body)
-            val streamKey = if (head.trimStart().startsWith("[")) null else "data"
-            when (CatalogFormat.sniff(head)) {
+            val streamKey = "data"
+            when (forced ?: CatalogFormat.sniff(head)) {
                 CatalogFormat.BULK_INDEX -> bulkDownloadUri(Json.parseToJsonElement(body.string()).obj())
                     ?: throw IOException("Bulk descriptor without download_uri")
                 CatalogFormat.SCRYFALL_CARDS -> {
@@ -112,6 +117,8 @@ class UrlCatalogSource(
                 }
                 CatalogFormat.GENERIC -> {
                     val root = Json.parseToJsonElement(body.string())
+                    // A lone descriptor object that links to the real file is never a card: follow the link.
+                    root.obj()?.s("download_uri")?.let { return@getWithRetry it }
                     CatalogAdapters.findCardObjects(root).forEach { o -> CatalogAdapters.generic(o)?.let { out.add(it) } }
                     null
                 }
@@ -146,12 +153,20 @@ class UrlCatalogSource(
         }.orEmpty()
         progress(SyncProgress("${base.host} · Card Game Simulator cards"))
         val cardsRoot = http.getJson(resolve(d.allCardsUrl))
-        val array = when {
-            cardsRoot is JsonArray -> cardsRoot
-            !d.allCardsWrapper.isNullOrBlank() -> (cardsRoot as? JsonObject)?.get(d.allCardsWrapper) as? JsonArray
-            else -> (cardsRoot as? JsonObject)?.values?.firstOrNull { it is JsonArray } as? JsonArray
-        } ?: throw IOException("CGS cards file has no card array")
-        array.forEach { el -> el.obj()?.let { CatalogAdapters.cgsCard(it, d, setNames) }?.let { out.add(it) } }
+        val cardObjects: List<JsonObject> = when {
+            cardsRoot is JsonArray -> cardsRoot.mapNotNull { it.obj() }
+            cardsRoot is JsonObject -> {
+                val wrapped = d.allCardsWrapper?.takeIf { it.isNotBlank() }?.let { cardsRoot[it] }
+                val arr = (wrapped as? JsonArray) ?: cardsRoot.values.firstOrNull { it is JsonArray } as? JsonArray
+                // Some files are maps id -> card.
+                arr?.mapNotNull { it.obj() } ?: cardsRoot.entries.mapNotNull { (key, v) ->
+                    // id -> card map: the key is the card id when the card does not carry one itself.
+                    v.obj()?.let { if (it.containsKey("cardId") || it.containsKey("id")) it else JsonObject(it + ("id" to JsonPrimitive(key))) }
+                }.takeIf { it.isNotEmpty() } ?: throw IOException("CGS cards file has no card array")
+            }
+            else -> throw IOException("CGS cards file has no card array")
+        }
+        cardObjects.forEach { o -> CatalogAdapters.cgsCard(o, d, setNames)?.let { out.add(it) } }
     }
 
     /** Scryfall: `/bulk-data/default-cards` is the descriptor itself; `/bulk-data` is a list of descriptors. */

@@ -60,7 +60,7 @@ La app **no pide claves de API ni usa servidores propios**. URLs por defecto (`d
 | Digimon | `digimoncard.io/api-public/search.php?series=Digimon Card Game` | – |
 | Lorcana | `api.lorcana-api.com/cards/all` | Lorcast |
 | One Piece | `raw.githubusercontent.com/Coko7/vegapull-records/main/data/english/packs.json` → un `cards_<id>.json` por pack | OPTCG API |
-| Fusion World | `limitlesstcg.s3.us-east-2.amazonaws.com/dbs/fw/db/cards.json` | `raw.githubusercontent.com/TheSench/CGS-DBS-Fusion-World/main/cards.json` (también se entiende un juego de **Card Game Simulator**: `allCardsUrl`) |
+| Fusion World | `raw.githubusercontent.com/dragogodev/cgs/master/Dragon%20Ball%20Super%20Fusion%20World/cgs.json` (descriptor de **Card Game Simulator**: `allCardsUrl` / `allSetsUrl`) | — |
 
 **Gundam y Riftbound se eliminaron** de la app (sin fuente pública estable). Si una URL por defecto falla, el campo de Ajustes permite pegar otra; un juego sin URL ni catálogo muestra el aviso *«Importa un catálogo JSON o pega la URL comunitaria…»*.
 

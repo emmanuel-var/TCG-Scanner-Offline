@@ -85,7 +85,7 @@ object Games {
             GameId.DBS_FW, R.string.game_dbs_fw, R.string.collection_dbs_fw, 0xFFEF6C00, "DB",
             listOf(CardVariant.NORMAL, CardVariant.PARALLEL, CardVariant.PROMO),
             OcrScript.LATIN, NumberStyle.CODE,
-            listOf(SourceId.CATALOG_URL, SourceId.CATALOG_URL_BACKUP)
+            listOf(SourceId.CATALOG_URL)
         ),
         GameDef(
             GameId.DIGIMON, R.string.game_digimon, R.string.collection_digimon, 0xFF0288D1, "DG",

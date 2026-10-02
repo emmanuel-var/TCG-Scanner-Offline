@@ -114,21 +114,30 @@ class Http(val client: OkHttpClient = defaultClient()) {
 
 /** Low-memory streaming over very large JSON documents (Scryfall bulk data, MTGJSON prices...). */
 object JsonStream {
-    /** Streams every element of the array found under [key] in the root object (or the root array when [key] is null). */
+    /**
+     * Streams every object of the catalog array. The root decides how it is read: a root JSON array (Scryfall's
+     * bulk file: `[ {card}, {card}, ... ]`) is iterated element by element whatever [key] says; a root object
+     * is scanned for the array under [key] (or, when [key] is null, the first array it contains).
+     */
     suspend fun forEachArrayElement(body: ResponseBody, key: String?, onElement: suspend (JsonObject) -> Unit) {
         withContext(Dispatchers.IO) {
             JsonReader(InputStreamReader(body.byteStream(), Charsets.UTF_8)).use { reader ->
-                if (key == null) {
-                    if (reader.peek() == JsonToken.BEGIN_ARRAY) readArray(reader, onElement)
-                } else {
-                    reader.beginObject()
-                    while (reader.hasNext()) {
-                        if (reader.nextName() == key && reader.peek() == JsonToken.BEGIN_ARRAY) {
-                            readArray(reader, onElement)
-                        } else {
-                            reader.skipValue()
+                when (reader.peek()) {
+                    JsonToken.BEGIN_ARRAY -> readArray(reader, onElement)
+                    JsonToken.BEGIN_OBJECT -> {
+                        reader.beginObject()
+                        var done = false
+                        while (reader.hasNext()) {
+                            val name = reader.nextName()
+                            if (!done && (key == null || name == key) && reader.peek() == JsonToken.BEGIN_ARRAY) {
+                                readArray(reader, onElement)
+                                done = true
+                            } else {
+                                reader.skipValue()
+                            }
                         }
                     }
+                    else -> Unit
                 }
             }
         }

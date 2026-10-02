@@ -28,8 +28,7 @@ class CatalogAdaptersTest {
         }
         assertEquals("https://api.pokemontcg.io/v2/cards?q=language:japanese", CatalogUrls.default(GameId.POKEMON_JP))
         assertTrue(CatalogUrls.default(GameId.ONE_PIECE)!!.contains("vegapull-records"))
-        assertEquals("https://limitlesstcg.s3.us-east-2.amazonaws.com/dbs/fw/db/cards.json", CatalogUrls.default(GameId.DBS_FW))
-        assertEquals("https://raw.githubusercontent.com/TheSench/CGS-DBS-Fusion-World/main/cards.json", CatalogUrls.backup(GameId.DBS_FW))
+        assertEquals("https://raw.githubusercontent.com/dragogodev/cgs/master/Dragon%20Ball%20Super%20Fusion%20World/cgs.json", CatalogUrls.default(GameId.DBS_FW))
     }
 
     @Test fun removedGamesAreGone() {

@@ -18,13 +18,11 @@ object CatalogUrls {
         // vegapull-records mirrors the vegapull scraper output: packs.json lists the packs and every pack has a
         // sibling cards_<packId>.json. The parser follows that index (CatalogFormat.VEGAPULL_PACKS).
         GameId.ONE_PIECE to "https://raw.githubusercontent.com/Coko7/vegapull-records/main/data/english/packs.json",
-        GameId.DBS_FW to "https://limitlesstcg.s3.us-east-2.amazonaws.com/dbs/fw/db/cards.json"
+        GameId.DBS_FW to "https://raw.githubusercontent.com/dragogodev/cgs/master/Dragon%20Ball%20Super%20Fusion%20World/cgs.json"
     )
 
-    /** Second source tried when [defaults] fails (see SourceId.CATALOG_URL_BACKUP). */
-    val backups: Map<GameId, String> = mapOf(
-        GameId.DBS_FW to "https://raw.githubusercontent.com/TheSench/CGS-DBS-Fusion-World/main/cards.json"
-    )
+    /** Second source tried when [defaults] fails (see SourceId.CATALOG_URL_BACKUP). No game has one right now. */
+    val backups: Map<GameId, String> = emptyMap()
 
     /** Defaults whose path or schema could not be verified when they were added. */
     val unverified: Set<GameId> = setOf(GameId.ONE_PIECE, GameId.DBS_FW)
