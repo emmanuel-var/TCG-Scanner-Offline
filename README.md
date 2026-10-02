@@ -79,15 +79,25 @@ La app **no pide claves de API ni usa servidores propios**. URLs por defecto (`d
 * **Re-vinculación heurística.** Cada fila de colección/mazo guarda una *foto* de identidad (nombre, set, número, etiqueta). Tras cada sync (y al importar o restaurar) `CardRelinker` busca filas cuyo catálogo ya no existe y las conecta por número exacto + similitud de nombre/set (`RelinkMatcher`); si hay empate no adivina y la fila conserva su foto (se sigue mostrando por nombre).
 * **Migración Room 1→2** (`AppDatabase.MIGRATION_1_2`): añade las columnas, rellena las fotos y vacía el catálogo descargable para que se regenere con llaves estables.
 
-## Escáner
+## Escáner: pipeline híbrido en el dispositivo
 
-1. **ML Kit Text Recognition** (modelo incluido en el APK, offline): lee nombre y número impreso (`OP01-120`, `025/198`, `LOB-EN005`…). `CardTextParser` extrae candidatos y `ScanMatcher` los cruza en Room solo para el juego activo (número exacto + similitud de nombre con tolerancia a errores de OCR). Hacen falta 2 lecturas consistentes antes de fijar.
-2. **Resolución de variantes**: *bottom sheet* con versión, estado/slab, cantidad y precio manual opcional, más «otras ediciones de esta carta».
-3. **Cartas de arte completo y motor visual**: el escáner abre con OCR inmediatamente, sin pantallas de carga. Si `filesDir/card_embedder.tflite` no existe, una tarjeta translúcida sobre la cámara ofrece descargarlo (~15 MB) con un `OneTimeWorkRequest` (`ModelDownloadWorker`: reanudable, escribe a `.part` y valida tamaño/SHA-256 antes de renombrar). `ModelRepository.state` (`StateFlow`) se deriva del `WorkInfo` y del archivo: `Missing → Downloading(progreso) → Ready`. Al llegar a `Ready` se carga el intérprete, la tarjeta desaparece y el botón «Identificar por ilustración» se habilita sin reiniciar nada. Las firmas de ilustraciones se generan desde Ajustes (opcional). Ver `docs/SCANNER_MODEL.md`.
+```
+cámara ─► 1. YOLO11n (TFLite)        caja de la carta → refinado de esquinas → recorte con corrección de perspectiva
+        ─► 2. PaddleOCR-Mobile (ONNX) texto de la carta limpia → Regex del juego (p. ej. OP01-120) → Room (índices)
+        ─► 3. EfficientNet-Lite0      solo si el usuario pulsa «Identificar por ilustración» → coseno sobre vectores en RAM
+        ─► 4. Bottom sheet            la persona elige la variante (Normal / Holo / Reverse / 1.ª Edición…) y el estado o slab
+```
 
-## Entrenar el modelo visual (Python)
+* **Degradación elegante.** Sin descargar nada la cámara ya lee: ML Kit (incluido en el APK) sobre el marco guía. Un aviso translúcido ofrece el *motor de escaneo* (YOLO11n + PaddleOCR, ~21 MB); después, el *motor visual* (EfficientNet-Lite0, ~13 MB). Cada motor se descarga con WorkManager (`ModelDownloadWorker`, reanudable, validado) y su `StateFlow` (`ModelRepository`) hace que el aviso desaparezca y el motor se cargue sin reiniciar (ver `docs/SCANNER_MODEL.md`).
+* **Fase 1** (`scanner/pipeline`): `YoloCardDetector` (letterbox + `YoloDecoder` + NMS) → `QuadRefiner` (Sobel + Otsu + casco convexo, sin OpenCV) → `PerspectiveCropper` (`Matrix.setPolyToPoly`) a 512×704. Si la carta está de lado o al revés, el siguiente fotograma prueba 180°. El contorno detectado se dibuja sobre la vista previa.
+* **Fase 2** (`scanner/paddle`): detector DB + reconocedor CTC con ONNX Runtime (`PaddleOcrEngine`, post-proceso en Kotlin puro: `DbPostProcessor`, `CtcDecoder`). `CardPatterns` define el Regex por juego (One Piece `[A-Z]{2}\d{2}-\d{3}` y variantes, Digimon, Yu-Gi-Oh!, Gundam, Fusion World, Riftbound, fracciones tipo `025/198`) y corrige confusiones O/0 e I/l/1 del OCR.
+* **Rendimiento de la búsqueda.** Todas las consultas de la cámara empiezan por `gameId`: `(gameId, setKey, numberKey)` para set+número, `(gameId, numberKey)`, `(gameId, nameKey)` para nombre exacto y *range scan* por prefijo; solo si no hay ningún candidato se hace un `LIKE '%…%'`. Los índices están declarados en la entidad (`CardEntity`, alias `CatalogCard`; columnas `game_id`=`gameId`, `set_number`=`setKey`, `card_number`=`numberKey`, `name`=`nameKey`) y hay migración Room 2→3.
+* **Fase 3 sin SQLite.** Al iniciar, `ScannerViewModel` carga en RAM (`viewModelScope`) los embeddings del juego activo en un `VectorIndex` (un único `FloatArray` contiguo, vectores normalizados); cada consulta es un recorrido con productos punto (coseno) y un top‑k, sin tocar la base de datos. Si no hay número legible tras varios fotogramas, el botón se promueve a acción principal.
+* **Modelos** (sin entrenar nada; `tools/model/`): `export_yolo_card_detector.py`, `prepare_ocr_pack.py`, `export_efficientnet_lite0.py`, `release_checksums.py`. Se publican como archivos de un release y se descargan desde Ajustes → Motor de escaneo (carpeta configurable).
 
-`tools/model/`: `fetch_images.py` (descarga imágenes de referencia desde cualquier catálogo JSON) y `train_card_embedder.py` (MobileNetV2 + embedding de 128 dimensiones con margen coseno, aumentos tipo cámara, exporta `card_embedder.tflite` en fp16 y evalúa recuperación top-1/top-5). Ver `tools/model/README.md`. El contrato de entrada (recorte de arte, rango [-1, 1]) debe coincidir con `TfliteEmbedder`/`VisualSignature`.
+## Modelos (Python, sin entrenamiento)
+
+`tools/model/` convierte y verifica modelos publicados; ver su README. El script de entrenamiento anterior se eliminó.
 
 ## Compilar
 
@@ -117,9 +127,9 @@ Ver `docs/PLAY_STORE_CHECKLIST.md` y `docs/PRIVACY_POLICY.md`. Resumen: `targetS
 El proyecto se escribió en un entorno sin Android SDK ni acceso a Google Maven, por lo que **el APK completo no pudo compilarse allí**. Lo que sí se verificó con la JVM:
 
 * compilación de `core`, `data/remote` (todas las fuentes), entidades, valoración, parser OCR y modelos de intercambio;
-* 46 pruebas unitarias en `app/src/test` (texto, parser OCR, valoración, CSV, veredicto de intercambio, adaptadores y detección de formato incl. vegapull y CGS, llaves estables, re-vinculación, estados del modelo);
-* pruebas adicionales de `UrlCatalogSource` contra respuestas simuladas (paginación, descriptor de Scryfall, índice vegapull, descriptor CGS, override con enlace *blob*, juegos sin URL, enlace caído);
-* el script de entrenamiento se ejecutó de punta a punta con TensorFlow 2.21 sobre 60 cartas sintéticas, sin pesos ImageNet y en pocos minutos de CPU: entrena (la precisión de entrenamiento sube), exporta un `.tflite` de ~4.7 MB y lo evalúa con el intérprete TFLite (top-1 ≈ 0.42 / top-5 ≈ 0.68 frente a consultas muy distorsionadas, azar ≈ 0.02). **No lo entrené con cartas reales ni con pesos ImageNet** (descarga bloqueada aquí), así que no hay cifras de precisión reales todavía.
+* 68 pruebas (unitarias en `app/src/test` + integración ligera con respuestas simuladas): parser y Regex por juego, valoración, CSV, adaptadores de catálogo, llaves estables y re-vinculación, estados de los motores, geometría de la carta, decodificador YOLO (formatos y letterbox), post-proceso DB/CTC de PaddleOCR, índice vectorial en RAM, refinado de esquinas sobre imágenes sintéticas;
+* compilan contra los JAR reales de TensorFlow Lite, ONNX Runtime y Android: `YoloCardDetector`, `PaddleOcrEngine`, `PerspectiveCropper`, `ScanPipeline`;
+* `export_efficientnet_lite0.py` (ruta Keras) se ejecutó de punta a punta con TensorFlow 2.21 (pesos aleatorios: los repositorios de modelos no son accesibles aquí).
 
 Antes de publicar: compila en Android Studio, corrige cualquier error menor de API, y prueba en dispositivo real el escáner, el arrastrar y soltar, Nearby (dos teléfonos con Google Play Services) y las fuentes con red real.
 
