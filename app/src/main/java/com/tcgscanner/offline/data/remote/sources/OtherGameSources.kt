@@ -124,10 +124,12 @@ class TcgdexSource(private val http: Http) : CatalogSource {
         val base = "https://api.tcgdex.net/v2/$lang"
         val sets = http.getJson("$base/sets").arr()?.mapNotNull { it.obj() } ?: error("No sets")
         val batched = BatchedSink(sink)
+        var skipped = 0
         sets.forEachIndexed { i, brief ->
             val setId = brief.s("id") ?: return@forEachIndexed
             progress(SyncProgress("TCGdex · ${brief.s("name") ?: setId}", (i + 1f) / sets.size))
-            val set = http.getJson("$base/sets/$setId").obj() ?: return@forEachIndexed
+            // One broken set (404 for ids such as "SM1+", timeouts) must not abort the whole download.
+            val set = fetchSet(base, setId) ?: run { skipped++; return@forEachIndexed }
             val total = set.o("cardCount")?.get("official").int() ?: set.o("cardCount")?.get("total").int()
             set.a("cards")?.forEach { el ->
                 val c = el.obj() ?: return@forEach
@@ -148,5 +150,19 @@ class TcgdexSource(private val http: Http) : CatalogSource {
             }
         }
         batched.flush()
+        if (batched.total == 0) throw java.io.IOException("TCGdex returned no cards ($skipped of ${sets.size} sets failed)")
+    }
+
+    /** Set ids can contain characters like "+" ("SM1+"): try the percent-encoded path first, then the raw one. */
+    private suspend fun fetchSet(base: String, setId: String): kotlinx.serialization.json.JsonObject? {
+        val encoded = java.net.URLEncoder.encode(setId, "UTF-8").replace("+", "%2B")
+        for (candidate in listOf(encoded, setId).distinct()) {
+            try {
+                return http.getJson("$base/sets/$candidate").obj() ?: continue
+            } catch (e: java.io.IOException) {
+                // 404 / timeout: try the next spelling, then give up on this set
+            }
+        }
+        return null
     }
 }
