@@ -18,9 +18,7 @@ enum class GameId(val code: String) {
     MTG("mtg"),
     YGO("ygo"),
     LORCANA("lorcana"),
-    RIFTBOUND("riftbound"),
     POKEMON_JP("pokemon_jp"),
-    GUNDAM("gundam"),
     DBS_FW("dbs_fw"),
     DIGIMON("digimon");
 
@@ -77,12 +75,6 @@ object Games {
             listOf(SourceId.CATALOG_URL, SourceId.LORCAST)
         ),
         GameDef(
-            GameId.RIFTBOUND, R.string.game_riftbound, R.string.collection_riftbound, 0xFF00897B, "RB",
-            listOf(CardVariant.NORMAL, CardVariant.FOIL),
-            OcrScript.LATIN, NumberStyle.CODE,
-            listOf(SourceId.CATALOG_URL)
-        ),
-        GameDef(
             GameId.POKEMON_JP, R.string.game_pokemon_jp, R.string.collection_pokemon_jp, 0xFFF9A825, "PJ",
             listOf(CardVariant.NORMAL, CardVariant.HOLO, CardVariant.REVERSE_HOLO, CardVariant.FIRST_EDITION),
             OcrScript.JAPANESE, NumberStyle.FRACTION,
@@ -90,16 +82,10 @@ object Games {
             languageTag = "ja"
         ),
         GameDef(
-            GameId.GUNDAM, R.string.game_gundam, R.string.collection_gundam, 0xFF283593, "GD",
-            listOf(CardVariant.NORMAL, CardVariant.PARALLEL, CardVariant.PROMO),
-            OcrScript.LATIN, NumberStyle.CODE,
-            listOf(SourceId.CATALOG_URL)
-        ),
-        GameDef(
             GameId.DBS_FW, R.string.game_dbs_fw, R.string.collection_dbs_fw, 0xFFEF6C00, "DB",
             listOf(CardVariant.NORMAL, CardVariant.PARALLEL, CardVariant.PROMO),
             OcrScript.LATIN, NumberStyle.CODE,
-            listOf(SourceId.CATALOG_URL)
+            listOf(SourceId.CATALOG_URL, SourceId.CATALOG_URL_BACKUP)
         ),
         GameDef(
             GameId.DIGIMON, R.string.game_digimon, R.string.collection_digimon, 0xFF0288D1, "DG",

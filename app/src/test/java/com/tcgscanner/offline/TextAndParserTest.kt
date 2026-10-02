@@ -68,7 +68,6 @@ class TextAndParserTest {
     @Test fun eachGameHasItsOwnCodePattern() {
         fun key(game: GameId, text: String) = CardTextParser.parse(listOf(OcrLine(text, 0.9f, 0.03f)), Games[game]).numbers.firstOrNull()?.key
         assertEquals("fb1-1", key(GameId.DBS_FW, "FB01-001"))
-        assertEquals("gd1-1", key(GameId.GUNDAM, "GD01-001"))
         assertEquals("bt1-10", key(GameId.DIGIMON, "BT1-010"))
         assertEquals("ex2-45", key(GameId.DIGIMON, "EX2-045"))
         assertEquals("lob-en5", key(GameId.YGO, "LOB-EN005"))

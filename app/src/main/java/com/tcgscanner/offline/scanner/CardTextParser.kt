@@ -33,17 +33,11 @@ object CardPatterns {
     /** "FB01-001", "FS01-001", "SB01-001", "P-001" (Dragon Ball Super Fusion World). */
     val fusionWorld = onePiece
 
-    /** "ST01-001", "GD01-001" (Gundam Card Game). */
-    val gundam = onePiece
-
     /** "BT1-010", "EX2-045", "ST10-01", "P-012", "RB1-001". */
     val digimon = Regex("\\b([A-Z]{1,2}$D{1,2})\\s?[-‐-―−]\\s?($D{2,3})\\b")
 
     /** "LOB-EN005", "SDY-006", "RA01-JP012", "LOB-E005". */
     val yugioh = Regex("\\b([A-Z0-9]{3,5})\\s?[-‐-―−]\\s?([A-Z]{1,2}$D{3})\\b")
-
-    /** Riftbound style "OGN-001/298" or "OGN-001". */
-    val riftbound = Regex("\\b([A-Z]{2,4})\\s?[-‐-―−]\\s?($D{3})(?:\\s?/\\s?($D{3}))?\\b")
 
     /** "025/198", "SV-P 045" is handled by [promo]. */
     val fraction = Regex("(?<![0-9])($D{1,3})\\s*/\\s*($D{2,3})(?![0-9])")
@@ -56,10 +50,8 @@ object CardPatterns {
     fun codeRegex(game: GameId): Regex? = when (game) {
         GameId.ONE_PIECE -> onePiece
         GameId.DBS_FW -> fusionWorld
-        GameId.GUNDAM -> gundam
         GameId.DIGIMON -> digimon
         GameId.YGO -> yugioh
-        GameId.RIFTBOUND -> riftbound
         else -> null
     }
 

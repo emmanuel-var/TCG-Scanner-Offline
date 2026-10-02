@@ -28,9 +28,7 @@
     <string name="game_mtg">Magic: The Gathering</string>
     <string name="game_ygo">Yu-Gi-Oh!</string>
     <string name="game_lorcana">Disney Lorcana</string>
-    <string name="game_riftbound">Riftbound</string>
     <string name="game_pokemon_jp">Pokémon Japan</string>
-    <string name="game_gundam">Gundam Card Game</string>
     <string name="game_dbs_fw">Dragon Ball Super Fusion World</string>
     <string name="game_digimon">Digimon Card Game</string>
     <string name="collection_pokemon">My Pokémon Collection</string>
@@ -38,9 +36,7 @@
     <string name="collection_mtg">My Magic Collection</string>
     <string name="collection_ygo">My Yu-Gi-Oh! Collection</string>
     <string name="collection_lorcana">My Lorcana Collection</string>
-    <string name="collection_riftbound">My Riftbound Collection</string>
     <string name="collection_pokemon_jp">My Pokémon Japan Collection</string>
-    <string name="collection_gundam">My Gundam Collection</string>
     <string name="collection_dbs_fw">My Fusion World Collection</string>
     <string name="collection_digimon">My Digimon Collection</string>
     <string name="variant_normal">Normal</string>

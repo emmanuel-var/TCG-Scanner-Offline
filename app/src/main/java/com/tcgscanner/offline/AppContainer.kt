@@ -50,7 +50,8 @@ class AppContainer(val app: Application) {
         settings.settings.stateIn(scope, SharingStarted.Eagerly, null)
 
     private val sources = listOf(
-        UrlCatalogSource(http) { game: GameId -> settings.catalogUrlOnce(game) },
+        UrlCatalogSource(http, { game: GameId -> settings.catalogUrlOnce(game) }),
+        UrlCatalogSource(http, { game: GameId -> settings.catalogUrlOnce(game) }, backup = true),
         MtgJsonSource(http), OptcgSource(http), LorcastSource(http), TcgdexSource(http)
     ).associateBy { it.id }
 

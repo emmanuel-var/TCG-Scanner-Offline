@@ -60,10 +60,11 @@ La app **no pide claves de API ni usa servidores propios**. URLs por defecto (`d
 | Digimon | `digimoncard.io/api-public/search.php?series=Digimon Card Game` | – |
 | Lorcana | `api.lorcana-api.com/cards/all` | Lorcast |
 | One Piece | `raw.githubusercontent.com/Coko7/vegapull-records/main/data/english/packs.json` → un `cards_<id>.json` por pack | OPTCG API |
-| Fusion World | *(sin URL por defecto)*: el parser entiende juegos de **Card Game Simulator** (`allCardsUrl` → AllCards.json + AllSets.json) | – |
-| Gundam, Riftbound | *(sin URL por defecto)* | – |
+| Fusion World | `limitlesstcg.s3.us-east-2.amazonaws.com/dbs/fw/db/cards.json` | `raw.githubusercontent.com/TheSench/CGS-DBS-Fusion-World/main/cards.json` (también se entiende un juego de **Card Game Simulator**: `allCardsUrl`) |
 
-**Juegos sin fuente estable** (Gundam, Riftbound y Fusion World): no se incluye una URL inventada. Su estado inicial muestra *«Importa un catálogo JSON o pega la URL comunitaria en Ajustes para activar este juego»* (en el Hub, en el Portafolio con botones *Importar archivo* / *Abrir Ajustes*, y en el campo de URL de Ajustes). El worker no reintenta ni marca error mientras no haya fuente.
+**Gundam y Riftbound se eliminaron** de la app (sin fuente pública estable). Si una URL por defecto falla, el campo de Ajustes permite pegar otra; un juego sin URL ni catálogo muestra el aviso *«Importa un catálogo JSON o pega la URL comunitaria…»*.
+
+**Magic:** la descarga sigue el descriptor de `bulk-data/default-cards` hasta su `download_uri` (también acepta la lista `/bulk-data`). No se usa `AllIdentifiers.json` de MTGJSON como fuente principal: pesa cientos de MB, no trae nombres de set ni imágenes y es inviable en un teléfono; MTGJSON (por sets) queda como respaldo.
 
 **Detección de formato** (`UrlCatalogSource`, primeros 16 KB): Pokémon TCG API, Scryfall (descriptor y array), YGOPRODeck, lorcana-api, DigimonCard.io, **vegapull-records** (índice de packs y `cards_*.json`), **Card Game Simulator** (descriptor del juego) y, para cualquier otro JSON (volcados comunitarios, datos de mods de Tabletop Simulator, el formato de `docs/CATALOG_FORMAT.md`), un extractor genérico con alias de campos.
 

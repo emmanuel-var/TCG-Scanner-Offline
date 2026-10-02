@@ -81,6 +81,8 @@ enum class DeckZone(val code: String, @StringRes val labelRes: Int) {
 enum class SourceId(val label: String) {
     /** The per-game catalog URL (community default or the user's override); format is auto-detected. */
     CATALOG_URL("Catalog URL"),
+    /** Second built-in URL of a game (CatalogUrls.backups), tried when the first one fails. */
+    CATALOG_URL_BACKUP("Backup catalog URL"),
     MTGJSON("MTGJSON"),
     OPTCG("OPTCG API"),
     LORCAST("Lorcast"),

@@ -32,12 +32,14 @@ enum class CatalogFormat {
             val lower = h.lowercase()
             return when {
                 !h.startsWith("[") && h.contains("\"download_uri\"") -> BULK_INDEX
+                // Scryfall cards must be recognised BEFORE the Pokémon check: they carry purchase_uris.tcgplayer
+                // (a string), which used to be mistaken for the Pokémon TCG API's tcgplayer price object.
+                h.contains("\"scryfall_uri\"") || (h.contains("\"collector_number\"") && h.contains("\"set_name\"")) -> SCRYFALL_CARDS
                 lower.contains("\"allcardsurl\"") -> CGS_GAME
                 h.contains("\"title_parts\"") || (h.contains("\"raw_title\"") && h.contains("\"id\"")) -> VEGAPULL_PACKS
                 h.contains("\"pack_id\"") && (h.contains("\"img_url\"") || h.contains("\"img_full_url\"")) -> VEGAPULL_CARDS
                 h.contains("\"card_sets\"") -> YGOPRODECK
-                h.contains("\"supertype\"") || h.contains("\"tcgplayer\"") -> POKEMON_TCG
-                h.contains("\"collector_number\"") && h.contains("\"set_name\"") -> SCRYFALL_CARDS
+                h.contains("\"supertype\"") || Regex("\"tcgplayer\"\\s*:\\s*\\{").containsMatchIn(h) -> POKEMON_TCG
                 h.contains("\"Card_Num\"") || h.contains("\"Set_ID\"") -> LORCANA_API
                 h.contains("\"digi_type\"") || h.contains("\"play_cost\"") || h.contains("\"evolution_cost\"") -> DIGIMON_CARD_IO
                 else -> GENERIC

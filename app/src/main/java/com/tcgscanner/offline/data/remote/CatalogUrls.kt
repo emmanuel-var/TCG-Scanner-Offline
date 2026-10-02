@@ -3,12 +3,9 @@ package com.tcgscanner.offline.data.remote
 import com.tcgscanner.offline.core.GameId
 
 /**
- * Default, credential-free catalog location per game. Games WITHOUT an entry (Gundam, Riftbound, Fusion World)
- * have no stable public source yet: the app asks the user to import a JSON file or paste a community URL
- * in Settings instead of shipping a link that may not exist.
- *
- * [unverified] lists defaults whose exact path I could not confirm; they are tried first but a failure just
- * falls through to the secondary source (see Games.kt) and is reported in Settings.
+ * Default, credential-free catalog locations per game: open REST endpoints or static JSON dumps maintained by the
+ * community. Every one can be replaced by the user in Settings. A game may also have a [backups] URL that is tried
+ * automatically when the first one fails.
  */
 object CatalogUrls {
     val defaults: Map<GameId, String> = mapOf(
@@ -20,13 +17,22 @@ object CatalogUrls {
         GameId.LORCANA to "https://api.lorcana-api.com/cards/all",
         // vegapull-records mirrors the vegapull scraper output: packs.json lists the packs and every pack has a
         // sibling cards_<packId>.json. The parser follows that index (CatalogFormat.VEGAPULL_PACKS).
-        GameId.ONE_PIECE to "https://raw.githubusercontent.com/Coko7/vegapull-records/main/data/english/packs.json"
+        GameId.ONE_PIECE to "https://raw.githubusercontent.com/Coko7/vegapull-records/main/data/english/packs.json",
+        GameId.DBS_FW to "https://limitlesstcg.s3.us-east-2.amazonaws.com/dbs/fw/db/cards.json"
     )
 
-    val unverified: Set<GameId> = setOf(GameId.ONE_PIECE)
+    /** Second source tried when [defaults] fails (see SourceId.CATALOG_URL_BACKUP). */
+    val backups: Map<GameId, String> = mapOf(
+        GameId.DBS_FW to "https://raw.githubusercontent.com/TheSench/CGS-DBS-Fusion-World/main/cards.json"
+    )
+
+    /** Defaults whose path or schema could not be verified when they were added. */
+    val unverified: Set<GameId> = setOf(GameId.ONE_PIECE, GameId.DBS_FW)
 
     /** null = no built-in source; the user must import a file or paste a URL. */
     fun default(game: GameId): String? = defaults[game]
+
+    fun backup(game: GameId): String? = backups[game]
 
     fun requiresUserSource(game: GameId): Boolean = game !in defaults
 }

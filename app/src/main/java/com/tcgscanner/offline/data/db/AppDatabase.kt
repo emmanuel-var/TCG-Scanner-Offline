@@ -13,7 +13,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DeckEntity::class, DeckCardEntity::class, PortfolioSnapshotEntity::class, SyncStateEntity::class,
         CardSignatureEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -63,9 +63,25 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 -> v4: Gundam and Riftbound were removed from the app; drop their rows so nothing is left orphaned. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val games = "('gundam', 'riftbound')"
+                db.execSQL("DELETE FROM card_price WHERE cardId IN (SELECT id FROM card WHERE gameId IN $games)")
+                db.execSQL("DELETE FROM graded_price WHERE cardId IN (SELECT id FROM card WHERE gameId IN $games)")
+                db.execSQL("DELETE FROM card_signature WHERE gameId IN $games")
+                db.execSQL("DELETE FROM card WHERE gameId IN $games")
+                db.execSQL("DELETE FROM collection_item WHERE gameId IN $games")
+                db.execSQL("DELETE FROM deck_card WHERE deckId IN (SELECT id FROM deck WHERE gameId IN $games)")
+                db.execSQL("DELETE FROM deck WHERE gameId IN $games")
+                db.execSQL("DELETE FROM portfolio_snapshot WHERE gameId IN $games")
+                db.execSQL("DELETE FROM sync_state WHERE gameId IN $games")
+            }
+        }
+
         fun create(context: Context): AppDatabase =
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "tcg_scanner.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }
 }

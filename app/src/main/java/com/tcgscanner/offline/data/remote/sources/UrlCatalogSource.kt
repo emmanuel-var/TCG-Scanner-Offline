@@ -34,16 +34,19 @@ import java.io.IOException
  */
 class UrlCatalogSource(
     private val http: Http,
-    /** The user's override for [game], or blank to use the default. */
-    private val overrideFor: suspend (GameId) -> String
+    /** The user's override for [game], or blank to use the default. Ignored in [backup] mode. */
+    private val overrideFor: suspend (GameId) -> String,
+    /** true: read the game's built-in second URL ([CatalogUrls.backups]) instead of the override / default. */
+    private val backup: Boolean = false
 ) : CatalogSource {
-    override val id = SourceId.CATALOG_URL
+    override val id = if (backup) SourceId.CATALOG_URL_BACKUP else SourceId.CATALOG_URL
 
     @Volatile private var host: String? = null
     override val label: String get() = host ?: id.label
 
     override suspend fun sync(game: GameDef, sink: CatalogSink, progress: (SyncProgress) -> Unit) {
-        val configured = overrideFor(game.id).ifBlank { CatalogUrls.default(game.id).orEmpty() }
+        val configured = if (backup) CatalogUrls.backup(game.id).orEmpty()
+        else overrideFor(game.id).ifBlank { CatalogUrls.default(game.id).orEmpty() }
         if (configured.isBlank()) throw SourceNotConfigured("No catalog URL for ${game.id}: import a file or paste a URL in Settings")
         val url = UrlNormalizer.normalize(configured)
         val parsed = url.toHttpUrlOrNull()
@@ -72,7 +75,7 @@ class UrlCatalogSource(
             val head = peekHead(body)
             val streamKey = if (head.trimStart().startsWith("[")) null else "data"
             when (CatalogFormat.sniff(head)) {
-                CatalogFormat.BULK_INDEX -> Json.parseToJsonElement(body.string()).obj()?.s("download_uri")
+                CatalogFormat.BULK_INDEX -> bulkDownloadUri(Json.parseToJsonElement(body.string()).obj())
                     ?: throw IOException("Bulk descriptor without download_uri")
                 CatalogFormat.SCRYFALL_CARDS -> {
                     JsonStream.forEachArrayElement(body, streamKey) { o -> CatalogAdapters.scryfall(o)?.let { out.add(it); tick(out, progress) } }
@@ -149,6 +152,14 @@ class UrlCatalogSource(
             else -> (cardsRoot as? JsonObject)?.values?.firstOrNull { it is JsonArray } as? JsonArray
         } ?: throw IOException("CGS cards file has no card array")
         array.forEach { el -> el.obj()?.let { CatalogAdapters.cgsCard(it, d, setNames) }?.let { out.add(it) } }
+    }
+
+    /** Scryfall: `/bulk-data/default-cards` is the descriptor itself; `/bulk-data` is a list of descriptors. */
+    private fun bulkDownloadUri(root: JsonObject?): String? {
+        root ?: return null
+        root.s("download_uri")?.let { return it }
+        val entries = root.a("data")?.mapNotNull { it.obj() }.orEmpty()
+        return (entries.firstOrNull { it.s("type") == "default_cards" } ?: entries.firstOrNull())?.s("download_uri")
     }
 
     private suspend fun tick(out: BatchedSink, progress: (SyncProgress) -> Unit) {

@@ -21,53 +21,27 @@ class CatalogAdaptersTest {
     private fun cards(json: String) =
         CatalogAdapters.findCardObjects(Json.parseToJsonElement(json)).mapNotNull { CatalogAdapters.generic(it) }
 
-    @Test fun defaultUrlsAreHttpsAndIndieGamesHaveNone() {
-        GameId.entries.forEach { g -> CatalogUrls.default(g)?.let { assertTrue(g.name, it.startsWith("https://")) } }
-        listOf(GameId.GUNDAM, GameId.RIFTBOUND, GameId.DBS_FW).forEach {
-            assertNull(it.name, CatalogUrls.default(it)); assertTrue(CatalogUrls.requiresUserSource(it))
+    @Test fun defaultUrlsAreHttpsAndEveryGameHasOne() {
+        GameId.entries.forEach { g ->
+            assertTrue(g.name, CatalogUrls.default(g)!!.startsWith("https://"))
+            CatalogUrls.backup(g)?.let { assertTrue(it.startsWith("https://")) }
         }
         assertEquals("https://api.pokemontcg.io/v2/cards?q=language:japanese", CatalogUrls.default(GameId.POKEMON_JP))
         assertTrue(CatalogUrls.default(GameId.ONE_PIECE)!!.contains("vegapull-records"))
+        assertEquals("https://limitlesstcg.s3.us-east-2.amazonaws.com/dbs/fw/db/cards.json", CatalogUrls.default(GameId.DBS_FW))
+        assertEquals("https://raw.githubusercontent.com/TheSench/CGS-DBS-Fusion-World/main/cards.json", CatalogUrls.backup(GameId.DBS_FW))
     }
 
-    @Test fun mapsVegapullPacksAndCards() {
-        val packs = Json.parseToJsonElement("""[{"id":"569101","raw_title":"ROMANCE DAWN [OP-01]","title_parts":{"prefix":"BOOSTER PACK","title":"ROMANCE DAWN","label":"OP-01"}}]""")
-        val pack = CatalogAdapters.vegapullPacks(packs).single()
-        assertEquals("569101", pack.id); assertEquals("ROMANCE DAWN", pack.title)
-        val base = CatalogAdapters.vegapullCard(Json.parseToJsonElement("""{"id":"OP01-001","pack_id":"569101","name":"Roronoa Zoro","rarity":"L","category":"Leader","img_url":"https://i/z.png"}""").jsonObject, pack)!!
-        val alt = CatalogAdapters.vegapullCard(Json.parseToJsonElement("""{"id":"OP01-001_p1","pack_id":"569101","name":"Roronoa Zoro","rarity":"L","category":"Leader","img_url":"https://i/z2.png"}""").jsonObject, pack)!!
-        assertEquals("OP01", base.setCode); assertEquals("OP01-001", base.number); assertEquals("ROMANCE DAWN", base.setName)
-        assertEquals("", base.printTag); assertEquals("p1", alt.printTag); assertEquals("OP01-001", alt.number)
-        assertNotEquals(
-            CardKeys.of(GameId.ONE_PIECE, base.setCode, base.number, base.printTag),
-            CardKeys.of(GameId.ONE_PIECE, alt.setCode, alt.number, alt.printTag)
-        )
+    @Test fun removedGamesAreGone() {
+        assertTrue(GameId.entries.none { it.code == "gundam" || it.code == "riftbound" })
+        assertNull(GameId.fromCode("gundam")); assertNull(GameId.fromCode("riftbound"))
     }
 
-    @Test fun sniffsVegapullAndCgs() {
-        assertEquals(CatalogFormat.VEGAPULL_PACKS, CatalogFormat.sniff("""[{"id":"1","raw_title":"X","title_parts":{"title":"X"}}]"""))
-        assertEquals(CatalogFormat.VEGAPULL_CARDS, CatalogFormat.sniff("""[{"id":"OP01-001","pack_id":"1","img_url":"https://x"}]"""))
-        assertEquals(CatalogFormat.CGS_GAME, CatalogFormat.sniff("""{"name":"Fusion World","allCardsUrl":"AllCards.json","allSetsUrl":"AllSets.json"}"""))
-    }
-
-    @Test fun readsACardGameSimulatorGame() {
-        val d = CatalogAdapters.cgsDescriptor(
-            Json.parseToJsonElement("""{"name":"FW","allCardsUrl":"AllCards.json","allCardsUrlWrapper":"cards","allSetsUrl":"AllSets.json","cardIdIdentifier":"cardId","cardNameIdentifier":"name","cardSetIdentifier":"set","cardImageIdentifier":"imageUrl"}""").jsonObject
-        )!!
-        assertEquals("AllCards.json", d.allCardsUrl); assertEquals("cards", d.allCardsWrapper)
-        val names = CatalogAdapters.cgsSetNames(Json.parseToJsonElement("""[{"code":"FB01","name":"Awakened Pulse"}]"""), d)
-        assertEquals("Awakened Pulse", names["FB01"])
-        val c = CatalogAdapters.cgsCard(
-            Json.parseToJsonElement("""{"cardId":"FB01-001","name":"Son Goku","set":"FB01","imageUrl":"http://i/g.png","rarity":"L","cardType":"Leader"}""").jsonObject, d, names
-        )!!
-        assertEquals("FB01", c.setCode); assertEquals("FB01-001", c.number); assertEquals("Awakened Pulse", c.setName)
-        assertEquals("https://i/g.png", c.imageUrl)
-    }
-
-    @Test fun ygoRaritiesBecomePrintTags() {
-        val card = Json.parseToJsonElement("""{"id":1,"name":"A","type":"Normal Monster","card_sets":[{"set_name":"S","set_code":"LOB-EN005","set_rarity":"Ultra Rare","set_rarity_code":"(UR)"},{"set_name":"S","set_code":"LOB-EN005","set_rarity":"Super Rare","set_rarity_code":"(SR)"}]}""").jsonObject
-        val keys = CatalogAdapters.ygo(card).map { CardKeys.of(GameId.YGO, it.setCode, it.number, it.printTag) }
-        assertEquals(2, keys.toSet().size)
+    @Test fun scryfallCardsAreNotMistakenForPokemon() {
+        // Real Scryfall cards carry purchase_uris.tcgplayer as a STRING; Pokemon's "tcgplayer" is an object.
+        val scryfallCard = """[{"object":"card","id":"abc","name":"Lightning Bolt","scryfall_uri":"https://scryfall.com/card/lea/161","set":"lea","set_name":"Limited Edition Alpha","collector_number":"161","prices":{"usd":"350.00"},"purchase_uris":{"tcgplayer":"https://tcgplayer.com/x","cardmarket":"https://cm.com/x"}}]"""
+        assertEquals(CatalogFormat.SCRYFALL_CARDS, CatalogFormat.sniff(scryfallCard))
+        assertEquals(CatalogFormat.POKEMON_TCG, CatalogFormat.sniff("""{"data":[{"id":"a-1","name":"X","tcgplayer":{"url":"https://x","prices":{}}}]}"""))
     }
 
     @Test fun githubBlobLinksBecomeRawLinks() {

@@ -86,7 +86,7 @@ class HubViewModel(private val c: AppContainer) : ViewModel() {
         if (ids.isEmpty()) flowOf(emptyList())
         else combine(ids.sortedBy { it.ordinal }.map { id ->
             combine(c.portfolio.observeSummary(id), c.catalog.observeCount(id), c.settingsState) { s, n, settings ->
-                // No built-in URL (Gundam, Riftbound, Fusion World), none pasted yet and nothing imported: ask the user.
+                // No built-in URL for the game, none pasted yet and nothing imported: ask the user.
                 val needs = n == 0 && CatalogUrls.requiresUserSource(id) && settings?.catalogUrls?.containsKey(id) != true
                 HubTile(Games[id], s, n, needs)
             }
