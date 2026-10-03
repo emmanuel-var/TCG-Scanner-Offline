@@ -7,6 +7,16 @@
 package com.tcgscanner.offline.ui.screens
 
 import android.content.Context
+import com.tcgscanner.offline.ui.LocalContainer
+import com.tcgscanner.offline.core.AppLanguages
+import androidx.core.os.LocaleListCompat
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
+import androidx.appcompat.app.AppCompatDelegate
+import android.content.ContextWrapper
+import android.app.Activity
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -242,6 +252,11 @@ fun SettingsScreen(nav: NavController, onBack: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // ---- Language (applies instantly, no restart) --------------------------------------------------------
+            Section(stringResource(R.string.section_language)) {
+                LanguagePicker()
+            }
+
             // ---- Sync ---------------------------------------------------------------------------------------
             Section(stringResource(R.string.section_sync)) {
                 Text(stringResource(R.string.sync_explainer), style = MaterialTheme.typography.bodyMedium)
@@ -370,6 +385,19 @@ fun SettingsScreen(nav: NavController, onBack: () -> Unit) {
                 OutlinedButton(onClick = { baseError = vm.saveModelBaseUrl(base) }, enabled = base != s.modelBaseUrl) { Text(stringResource(R.string.save)) }
             }
 
+            // ---- Advertising / consent (UMP) ------------------------------------------------------------------
+            val ads = LocalContainer.current.ads
+            val privacyOptionsRequired by ads.privacyOptionsRequired.collectAsStateWithLifecycle()
+            Section(stringResource(R.string.section_ads)) {
+                Text(stringResource(R.string.ads_explainer), style = MaterialTheme.typography.bodyMedium)
+                if (privacyOptionsRequired) {
+                    OutlinedButton(
+                        onClick = { context.findActivity()?.let { ads.showPrivacyOptions(it) } },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(stringResource(R.string.ads_privacy_options)) }
+                }
+            }
+
             // ---- About / data ---------------------------------------------------------------------------------
             Section(stringResource(R.string.section_about)) {
                 OutlinedButton(onClick = { nav.navigate(Routes.ABOUT) }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.about_privacy)) }
@@ -492,4 +520,44 @@ private fun PackRow(pack: EnginePack, state: ModelState, onDownload: () -> Unit,
         if (state is ModelState.Failed) Text(stringResource(R.string.model_failed), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         if (state is ModelState.Ready) Text(stringResource(R.string.model_ready), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
     }
+}
+
+
+/** One row per shipped language plus "System default". Applying a language recreates the activity: no app restart. */
+@Composable
+private fun LanguagePicker() {
+    var selected by remember {
+        mutableStateOf(
+            AppCompatDelegate.getApplicationLocales().takeIf { !it.isEmpty }?.get(0)
+                ?.let { AppLanguages.matching(it.language)?.tag }.orEmpty()
+        )
+    }
+    fun choose(tag: String) {
+        selected = tag
+        AppCompatDelegate.setApplicationLocales(
+            if (tag.isEmpty()) LocaleListCompat.getEmptyLocaleList() else LocaleListCompat.forLanguageTags(tag)
+        )
+    }
+    Text(stringResource(R.string.language_explainer), style = MaterialTheme.typography.bodyMedium)
+    Column(Modifier.selectableGroup()) {
+        val options = listOf("" to stringResource(R.string.language_system)) + AppLanguages.all.map { it.tag to it.nativeName }
+        options.forEach { (tag, name) ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .selectable(selected = selected == tag, role = Role.RadioButton, onClick = { choose(tag) })
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(selected = selected == tag, onClick = null)
+                Text(name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 12.dp))
+            }
+        }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

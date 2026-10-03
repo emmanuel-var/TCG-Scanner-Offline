@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Advertising ID, used by AdMob (Play Console: declare "Advertising ID" in App content) -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
     <!-- Offline P2P trading (Google Nearby Connections: Bluetooth / Wi-Fi Direct) -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -39,6 +41,21 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TCGScanner"
         tools:targetApi="34">
+
+        <!-- AdMob App ID: Google's TEST id. Replace with your real App ID before publishing. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713" />
+
+        <!-- Lets AppCompat remember the per-app language on Android 12 and older -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
 
         <activity
             android:name=".MainActivity"

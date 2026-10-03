@@ -2,7 +2,7 @@
 
 App Android (Kotlin + Jetpack Compose) para coleccionistas de cartas TCG que **funciona sin internet**: un catálogo local en SQLite (Room) se actualiza una vez al día y permite escanear, consultar precios y negociar en torneos o convenciones sin señal.
 
-Sin servidores propios, sin cuentas, sin anuncios, sin suscripciones. Exportar a CSV es gratis y sin límites.
+Sin servidores propios, sin cuentas, sin suscripciones. Muestra un banner de AdMob (con formulario de consentimiento UMP). Exportar a CSV es gratis y sin límites.
 
 ## Qué resuelve
 
@@ -137,3 +137,13 @@ Antes de publicar: compila en Android Studio, corrige cualquier error menor de A
 ## Aviso legal
 
 Herramienta independiente y no oficial. Los nombres de juegos e imágenes pertenecen a sus dueños y se usan solo para identificar cartas. Los emblemas de la app son generados (sin logos de terceros). Los precios son informativos, no asesoría financiera.
+
+
+## Idioma, anuncios e icono
+
+- **Idioma**: Ajustes → *Idioma*. Español, inglés, francés, alemán, portugués, chino (simplificado), japonés, ruso e hindi, más «predeterminado del sistema». Usa `AppCompatDelegate.setApplicationLocales` (por eso `MainActivity` es `AppCompatActivity`): la interfaz cambia al instante, sin reiniciar, y el idioma se recuerda (en Android 13+ también aparece en los ajustes del sistema, gracias a `locales_config.xml`). Cada idioma tiene su `res/values-xx/strings.xml`; `LanguageResourcesTest` comprueba que todos tengan las mismas claves y marcadores (`%1$d`...).
+- **Anuncios (AdMob)**: un banner adaptativo anclado bajo la app (no tapa contenido). Antes de pedir ningún anuncio se ejecuta el formulario de consentimiento de **Google UMP**; en las regiones donde es obligatorio, Ajustes → *Publicidad* ofrece reabrirlo. Ahora mismo se usan los **IDs de prueba** de Google:
+  - App ID (`AndroidManifest.xml`): `ca-app-pub-3940256099942544~3347511713`
+  - Banner (`ADMOB_BANNER_UNIT_ID` en `app/build.gradle.kts`): `ca-app-pub-3940256099942544/6300978111`
+  - **Antes de publicar**: sustituye ambos por los de tu cuenta de AdMob, declara el *ID de publicidad* y los anuncios en Play Console (Contenido de la app → Anuncios / Seguridad de los datos) y enlaza tu política de privacidad.
+- **Icono**: `res/drawable-nodpi/ic_launcher_foreground.png` (adaptativo, fondo `#FF681C`) y versión monocromática en vector; el icono de 512 px para la ficha de Play Store está en `docs/store/ic_launcher_512.png`.

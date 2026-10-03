@@ -19,10 +19,15 @@ mlkitText = "16.0.1"
 nearby = "19.3.0"
 litert = "1.4.0"
 onnxruntime = "1.30.0"
+appcompat = "1.7.0"
+# Ads: 23.x targets compileSdk 35 / Kotlin 1.9+ metadata, fine with AGP 8.10 and Kotlin 2.1. UMP is the consent SDK.
+playServicesAds = "23.6.0"
+ump = "3.1.0"
 junit = "4.13.2"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
@@ -54,6 +59,8 @@ mlkit-text-japanese = { module = "com.google.mlkit:text-recognition-japanese", v
 play-nearby = { module = "com.google.android.gms:play-services-nearby", version.ref = "nearby" }
 litert = { module = "com.google.ai.edge.litert:litert", version.ref = "litert" }
 onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android", version.ref = "onnxruntime" }
+play-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "playServicesAds" }
+ump = { module = "com.google.android.ump:user-messaging-platform", version.ref = "ump" }
 junit = { module = "junit:junit", version.ref = "junit" }
 
 [plugins]

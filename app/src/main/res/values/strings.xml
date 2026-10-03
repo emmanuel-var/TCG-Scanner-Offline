@@ -215,7 +215,7 @@
     <string name="trade_apply">Update my collection</string>
     <string name="trade_applied">Your collection was updated.</string>
     <string name="privacy_title_data">Your data stays on your phone</string>
-    <string name="privacy_body_data">Your collection, decks, portfolio history and settings are stored only in a local database on this device. The app has no account, no analytics, no ads and no servers of its own.</string>
+    <string name="privacy_body_data">Your collection, decks, portfolio history and settings are stored only in a local database on this device. The app has no account, no analytics and no servers of its own.</string>
     <string name="privacy_title_network">Network use</string>
     <string name="privacy_body_network">The app contacts public card-data sources (by default Pokémon TCG API, Scryfall, YGOPRODeck, Lorcana API, DigimonCard.io and community JSON files hosted on GitHub; you can replace any of these links in Settings) only to download catalogs and prices, and loads card images for display. These requests carry no account or personal data beyond what any web request reveals, such as your IP address. The optional visual engine model is downloaded from the link shown in Settings.</string>
     <string name="privacy_title_camera">Camera</string>
@@ -259,6 +259,14 @@
     <string name="pack_ocr_ja_name">Japanese text reader (PaddleOCR)</string>
     <string name="pack_embedder_name">Artwork engine (EfficientNet-Lite0)</string>
     <string name="pack_size_mb">About %1$d MB</string>
+    <string name="section_language">Language</string>
+    <string name="language_explainer">Choose the language of the whole app. It changes immediately, no restart needed.</string>
+    <string name="language_system">System default</string>
+    <string name="section_ads">Advertising</string>
+    <string name="ads_explainer">This app shows a banner ad (Google AdMob) at the bottom of the screen. You can review or change your consent choices at any time.</string>
+    <string name="ads_privacy_options">Ad privacy settings</string>
+    <string name="privacy_title_ads">Advertising</string>
+    <string name="privacy_body_ads">The app shows a banner ad served by Google AdMob. Where required, Google\'s consent form asks for your choice before any ad is requested; AdMob may use your device\'s advertising ID and IP address to serve and measure ads. You can change your choice at any time in Settings → Ad privacy settings.</string>
     <plurals name="cards_count">
         <item quantity="one">%d card</item>
         <item quantity="other">%d cards</item>

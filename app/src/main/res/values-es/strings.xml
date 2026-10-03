@@ -215,7 +215,7 @@
     <string name="trade_apply">Actualizar mi colección</string>
     <string name="trade_applied">Tu colección fue actualizada.</string>
     <string name="privacy_title_data">Tus datos se quedan en tu teléfono</string>
-    <string name="privacy_body_data">Tu colección, mazos, historial del portafolio y ajustes se guardan solo en una base de datos local en este dispositivo. La app no tiene cuenta, ni analítica, ni anuncios, ni servidores propios.</string>
+    <string name="privacy_body_data">Tu colección, mazos, historial del portafolio y ajustes se guardan solo en una base de datos local en este dispositivo. La app no tiene cuenta, ni analítica ni servidores propios.</string>
     <string name="privacy_title_network">Uso de red</string>
     <string name="privacy_body_network">La app contacta fuentes públicas de datos de cartas (por defecto Pokémon TCG API, Scryfall, YGOPRODeck, Lorcana API, DigimonCard.io y archivos JSON de la comunidad alojados en GitHub; puedes cambiar cualquiera de estos enlaces en Ajustes) solo para descargar catálogos y precios, y carga imágenes de cartas para mostrarlas. Estas peticiones no llevan cuenta ni datos personales más allá de lo que revela cualquier petición web, como tu dirección IP. El modelo opcional del motor visual se descarga desde el enlace que aparece en Ajustes.</string>
     <string name="privacy_title_camera">Cámara</string>
@@ -259,6 +259,14 @@
     <string name="pack_ocr_ja_name">Lector de texto japonés (PaddleOCR)</string>
     <string name="pack_embedder_name">Motor de ilustraciones (EfficientNet-Lite0)</string>
     <string name="pack_size_mb">Unos %1$d MB</string>
+    <string name="section_language">Idioma</string>
+    <string name="language_explainer">Elige el idioma de toda la aplicación. Cambia al instante, sin reiniciar.</string>
+    <string name="language_system">Predeterminado del sistema</string>
+    <string name="section_ads">Publicidad</string>
+    <string name="ads_explainer">Esta app muestra un anuncio de banner (Google AdMob) en la parte inferior de la pantalla. Puedes revisar o cambiar tus opciones de consentimiento en cualquier momento.</string>
+    <string name="ads_privacy_options">Ajustes de privacidad de anuncios</string>
+    <string name="privacy_title_ads">Publicidad</string>
+    <string name="privacy_body_ads">La app muestra un banner publicitario servido por Google AdMob. Cuando es obligatorio, el formulario de consentimiento de Google te pide tu elección antes de solicitar cualquier anuncio; AdMob puede usar el ID de publicidad y la dirección IP de tu dispositivo para mostrar y medir anuncios. Puedes cambiar tu elección en cualquier momento en Ajustes → Ajustes de privacidad de anuncios.</string>
     <plurals name="cards_count">
         <item quantity="one">%d carta</item>
         <item quantity="other">%d cartas</item>

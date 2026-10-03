@@ -4,7 +4,25 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Scan brackets -->
+    <path
+        android:pathData="M25.7,33.3V24.9H34.1M73.9,24.9H82.3V33.3M25.7,72.8V81.2H34.1M73.9,81.2H82.3V72.8"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.9"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <!-- Card -->
+    <path
+        android:pathData="M42,31h24.2a4,4 0,0 1,4 4v37.1a4,4 0,0 1,-4 4H42a4,4 0,0 1,-4 -4V35a4,4 0,0 1,4 -4z"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.9" />
     <path
         android:fillColor="#FF000000"
-        android:pathData="M38,26h32a4,4 0,0 1,4 4v48a4,4 0,0 1,-4 4H38a4,4 0,0 1,-4 -4V30a4,4 0,0 1,4 -4zM42,32a2,2 0,0 0,-2 2v22a2,2 0,0 0,2 2h24a2,2 0,0 0,2 -2V34a2,2 0,0 0,-2 -2zM30,52h48v3H30z" />
+        android:pathData="M43.8,38h20.4a1.5,1.5 0,0 1,1.5 1.5v16.6a1.5,1.5 0,0 1,-1.5 1.5H43.8a1.5,1.5 0,0 1,-1.5 -1.5V39.5a1.5,1.5 0,0 1,1.5 -1.5z" />
+    <!-- Scan line -->
+    <path
+        android:pathData="M20.9,54.2H87.1"
+        android:strokeColor="#FF000000"
+        android:strokeWidth="1.9"
+        android:strokeLineCap="round" />
 </vector>

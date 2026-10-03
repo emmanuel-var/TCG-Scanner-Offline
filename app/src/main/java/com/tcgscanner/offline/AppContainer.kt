@@ -1,6 +1,7 @@
 package com.tcgscanner.offline
 
 import android.app.Application
+import com.tcgscanner.offline.ads.AdsConsent
 import com.tcgscanner.offline.core.GameId
 import com.tcgscanner.offline.data.db.AppDatabase
 import com.tcgscanner.offline.data.prefs.AppSettings
@@ -44,6 +45,8 @@ class AppContainer(val app: Application) {
 
     val db: AppDatabase = AppDatabase.create(app)
     val settings = SettingsStore(app)
+    /** Ad consent (UMP) and AdMob start-up. */
+    val ads = AdsConsent(app)
     val http = Http()
 
     /** null until DataStore has delivered its first value. */

@@ -1,6 +1,19 @@
 package com.tcgscanner.offline.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavHostController
+import com.tcgscanner.offline.ads.BannerAd
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -33,7 +46,25 @@ fun AppRoot() {
 
     val nav = rememberNavController()
     val back: () -> Unit = { nav.popBackStack() }
+    val canShowAds by container.ads.canRequestAds.collectAsStateWithLifecycle()
 
+    // The banner sits below the app, never over it: the navigation area is its own box, so no screen content is covered.
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                // The banner takes over the bottom system inset, so screens must not pad for it a second time.
+                .then(if (canShowAds) Modifier.consumeWindowInsets(WindowInsets.navigationBars) else Modifier)
+        ) {
+            AppNavHost(nav, back)
+        }
+        if (canShowAds) BannerAd(Modifier.navigationBarsPadding())
+    }
+}
+
+@Composable
+private fun AppNavHost(nav: NavHostController, back: () -> Unit) {
     NavHost(navController = nav, startDestination = Routes.HUB) {
         composable(Routes.HUB) {
             HubScreen(

@@ -46,6 +46,7 @@ fun AboutScreen(onBack: () -> Unit) {
             listOf(
                 R.string.privacy_title_data to R.string.privacy_body_data,
                 R.string.privacy_title_network to R.string.privacy_body_network,
+                R.string.privacy_title_ads to R.string.privacy_body_ads,
                 R.string.privacy_title_camera to R.string.privacy_body_camera,
                 R.string.privacy_title_nearby to R.string.privacy_body_nearby,
                 R.string.privacy_title_delete to R.string.privacy_body_delete,
