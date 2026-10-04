@@ -105,7 +105,7 @@ dependencies {
     implementation(libs.work.runtime)
     implementation(libs.datastore)
 
-    implementation(libs.androidx.concurrent.futures)
+    implementation(libs.guava)
     implementation(libs.camerax.core)
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)
