@@ -267,6 +267,20 @@
     <string name="ads_privacy_options">広告のプライバシー設定</string>
     <string name="privacy_title_ads">広告</string>
     <string name="privacy_body_ads">このアプリは Google AdMob が配信するバナー広告を表示します。必要な場合は、広告をリクエストする前に Google の同意フォームで選択をお願いします。AdMob は、広告の配信と効果測定のために端末の広告 ID と IP アドレスを使用することがあります。選択はいつでも 設定 → 広告のプライバシー設定 で変更できます。</string>
+    <string name="setup_title">オフライン利用の準備中</string>
+    <string name="setup_scan_engine">スキャンエンジン</string>
+    <string name="setup_artwork_engine">イラストエンジン</string>
+    <string name="setup_catalog_item">%1$s のカタログ</string>
+    <string name="setup_waiting_wifi">ダウンロードのため Wi-Fi を待っています…</string>
+    <string name="setup_use_mobile_data">モバイルデータを使う</string>
+    <string name="setup_done">準備完了：オフラインで利用できます</string>
+    <string name="setup_failed">一部のダウンロードに失敗しました。スキャンは基本認識で引き続き動作します。</string>
+    <string name="setup_item_done">完了</string>
+    <string name="setup_item_waiting">待機中</string>
+    <string name="setup_item_failed">失敗</string>
+    <string name="setup_expand">詳細を表示</string>
+    <string name="setup_collapse">詳細を非表示</string>
+    <string name="setup_dismiss">閉じる</string>
     <plurals name="cards_count">
         <item quantity="other">%d 枚</item>
     </plurals>

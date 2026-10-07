@@ -90,17 +90,22 @@ class ModelRepository(
         }
     }
 
-    /** Starts the background download. KEEP: pressing the button twice never starts two downloads. */
-    fun download() {
+    /**
+     * Starts the background download. KEEP: pressing the button twice never starts two downloads.
+     * [unmeteredOnly] waits for Wi-Fi (the automatic first-run download honours the Wi-Fi-only preference);
+     * [replace] restarts a queued job with new constraints ("use mobile data"); partial files are resumed.
+     */
+    fun download(unmeteredOnly: Boolean = false, replace: Boolean = false) {
         scope.launch {
             loadError.value = null
             val base = settings.current().modelBaseUrl
+            val network = if (unmeteredOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
             val request = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
-                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(network).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .setInputData(workDataOf(ModelDownloadWorker.KEY_PACK to pack.id, ModelDownloadWorker.KEY_BASE_URL to base))
                 .build()
-            workManager.enqueueUniqueWork(pack.workName, ExistingWorkPolicy.KEEP, request)
+            workManager.enqueueUniqueWork(pack.workName, if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP, request)
         }
     }
 

@@ -104,6 +104,9 @@ class AppContainer(val app: Application) {
     /** The artwork pack ("visual engine"): kept as a shortcut because the scanner gates "identify by artwork" on it. */
     val models: ModelRepository get() = packs.getValue(EnginePack.EMBEDDER)
 
+    /** Downloads engines and catalogs as soon as the app opens and reports progress for the strip in AppRoot. */
+    val setup by lazy { AppSetup(app, scope, settings, db, catalog, sync, packs) }
+
     val scanMatcher = ScanMatcher(db)
     val visualMatcher by lazy { VisualMatcher(db, embedder) }
     val indexer by lazy { VisualIndexer(scope, db, http, embedder, visualMatcher) }

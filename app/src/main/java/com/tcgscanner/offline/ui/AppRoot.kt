@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.tcgscanner.offline.ui.components.SetupStrip
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import com.tcgscanner.offline.ads.BannerAd
@@ -47,6 +51,7 @@ fun AppRoot() {
     val nav = rememberNavController()
     val back: () -> Unit = { nav.popBackStack() }
     val canShowAds by container.ads.canRequestAds.collectAsStateWithLifecycle()
+    var stripVisible by remember { mutableStateOf(false) }
 
     // The banner sits below the app, never over it: the navigation area is its own box, so no screen content is covered.
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -55,10 +60,15 @@ fun AppRoot() {
                 .weight(1f)
                 .fillMaxWidth()
                 // The banner takes over the bottom system inset, so screens must not pad for it a second time.
-                .then(if (canShowAds) Modifier.consumeWindowInsets(WindowInsets.navigationBars) else Modifier)
+                .then(if (canShowAds || stripVisible) Modifier.consumeWindowInsets(WindowInsets.navigationBars) else Modifier)
         ) {
             AppNavHost(nav, back)
         }
+        // Engines + catalogs downloading in the background: a small tab above the ad, gone when everything is ready.
+        SetupStrip(
+            modifier = if (canShowAds) Modifier else Modifier.navigationBarsPadding(),
+            onVisibleChange = { stripVisible = it }
+        )
         if (canShowAds) BannerAd(Modifier.navigationBarsPadding())
     }
 }

@@ -66,10 +66,15 @@ object SyncScheduler {
      * games, or changing a URL while a sync runs, never drops work and never runs two syncs at once.
      * [manual] syncs ignore the Wi-Fi-only preference: the user explicitly asked for it.
      */
-    fun enqueueNow(context: Context, games: Collection<GameId>, wifiOnly: Boolean, manual: Boolean, purge: Collection<GameId> = emptyList()) {
+    fun enqueueNow(
+        context: Context, games: Collection<GameId>, wifiOnly: Boolean, manual: Boolean,
+        purge: Collection<GameId> = emptyList(),
+        /** First-run downloads must not wait for a charged battery. */
+        requireBatteryNotLow: Boolean = true
+    ) {
         if (games.isEmpty()) return
         val request = OneTimeWorkRequestBuilder<PriceSyncWorker>()
-            .setConstraints(constraints(wifiOnly && !manual))
+            .setConstraints(constraints(wifiOnly && !manual, requireBatteryNotLow))
             .setInputData(
                 Data.Builder()
                     .putStringArray(PriceSyncWorker.KEY_GAMES, games.map { it.code }.toTypedArray())
@@ -85,8 +90,8 @@ object SyncScheduler {
         WorkManager.getInstance(context).cancelUniqueWork(NOW)
     }
 
-    private fun constraints(wifiOnly: Boolean) = Constraints.Builder()
+    private fun constraints(wifiOnly: Boolean, requireBatteryNotLow: Boolean = true) = Constraints.Builder()
         .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
-        .setRequiresBatteryNotLow(true)
+        .setRequiresBatteryNotLow(requireBatteryNotLow)
         .build()
 }

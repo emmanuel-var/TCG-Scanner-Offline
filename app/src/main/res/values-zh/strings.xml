@@ -267,6 +267,20 @@
     <string name="ads_privacy_options">广告隐私设置</string>
     <string name="privacy_title_ads">广告</string>
     <string name="privacy_body_ads">本应用显示由 Google AdMob 投放的横幅广告。在需要时，Google 的同意表单会在任何广告请求之前征求你的选择；AdMob 可能使用你设备的广告 ID 和 IP 地址来投放和衡量广告。你可以随时在 设置 → 广告隐私设置 中更改你的选择。</string>
+    <string name="setup_title">正在准备离线使用</string>
+    <string name="setup_scan_engine">扫描引擎</string>
+    <string name="setup_artwork_engine">插画引擎</string>
+    <string name="setup_catalog_item">%1$s 图鉴</string>
+    <string name="setup_waiting_wifi">正在等待 Wi-Fi 以下载…</string>
+    <string name="setup_use_mobile_data">使用移动数据</string>
+    <string name="setup_done">一切就绪：应用可离线使用</string>
+    <string name="setup_failed">部分下载失败。扫描仍可通过基础识别使用。</string>
+    <string name="setup_item_done">就绪</string>
+    <string name="setup_item_waiting">等待中</string>
+    <string name="setup_item_failed">失败</string>
+    <string name="setup_expand">显示详情</string>
+    <string name="setup_collapse">隐藏详情</string>
+    <string name="setup_dismiss">关闭</string>
     <plurals name="cards_count">
         <item quantity="other">%d 张</item>
     </plurals>

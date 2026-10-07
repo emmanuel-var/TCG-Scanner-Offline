@@ -147,3 +147,7 @@ Herramienta independiente y no oficial. Los nombres de juegos e imágenes perten
   - Banner (`ADMOB_BANNER_UNIT_ID` en `app/build.gradle.kts`): `ca-app-pub-3940256099942544/6300978111`
   - **Antes de publicar**: sustituye ambos por los de tu cuenta de AdMob, declara el *ID de publicidad* y los anuncios en Play Console (Contenido de la app → Anuncios / Seguridad de los datos) y enlaza tu política de privacidad.
 - **Icono**: `res/drawable-nodpi/ic_launcher_foreground.png` (adaptativo, fondo `#FF681C`) y versión monocromática en vector; el icono de 512 px para la ficha de Play Store está en `docs/store/ic_launcher_512.png`.
+
+## Preparación automática al abrir la app
+
+Al abrir la app (`AppSetup`), se encolan en segundo plano los motores de escaneo (detector + OCR, y OCR japonés si hay un juego japonés activo), el motor de ilustraciones y el catálogo de cada juego activo que aún no tenga cartas. Una pequeña pestaña de progreso (`SetupStrip`, sobre el banner) muestra el avance, se puede expandir para ver cada descarga y desaparece al terminar. Respeta «Solo Wi-Fi» (con el botón *Usar datos móviles* para saltárselo) y ofrece *Reintentar* si algo falla; el escáner sigue funcionando con ML Kit mientras tanto. Los motores se descargan de `EnginePacks.DEFAULT_BASE_URL` (release `models-v1` del repositorio): **ese release debe existir con los archivos** para que la descarga funcione.
