@@ -28,8 +28,8 @@ android {
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // AdMob banner unit: Google's public TEST id (always serves test ads, never earns money).
-        // Before publishing, replace it with your real banner unit id, and the App ID in AndroidManifest.xml.
+        // AdMob banner unit. Debug builds always use Google's TEST unit so developing never clicks/loads real ads on
+        // your own account (that can get an AdMob account suspended); release builds use the real unit (see buildTypes).
         buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"ca-app-pub-3940256099942544/6300978111\"")
     }
 
@@ -46,6 +46,7 @@ android {
 
     buildTypes {
         release {
+            buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"ca-app-pub-5065513980633271/7996961312\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

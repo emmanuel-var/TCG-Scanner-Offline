@@ -42,10 +42,10 @@
         android:theme="@style/Theme.TCGScanner"
         tools:targetApi="34">
 
-        <!-- AdMob App ID: Google's TEST id. Replace with your real App ID before publishing. -->
+        <!-- AdMob App ID (real). The App ID alone never serves ads; the banner unit id decides (see app/build.gradle.kts). -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-5065513980633271~5670180870" />
 
         <!-- Lets AppCompat remember the per-app language on Android 12 and older -->
         <service

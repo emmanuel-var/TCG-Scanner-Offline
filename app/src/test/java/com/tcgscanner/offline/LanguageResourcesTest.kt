@@ -51,11 +51,16 @@ class LanguageResourcesTest {
         assertNull(AppLanguages.matching(null))
     }
 
-    @Test fun testAdIdsAreInPlaceAndNoRealOnes() {
+    @Test fun adIdsAreWiredAndDebugNeverUsesTheRealUnit() {
         val manifest = File(res, "../AndroidManifest.xml").readText()
-        assertTrue(manifest.contains("ca-app-pub-3940256099942544~3347511713"))
         assertTrue(manifest.contains("com.google.android.gms.ads.APPLICATION_ID"))
+        assertTrue(manifest.contains("ca-app-pub-5065513980633271~5670180870"))
         val gradle = File(res, "../../../build.gradle.kts").readText()
-        assertTrue(gradle.contains("ca-app-pub-3940256099942544/6300978111"))
+        val defaultConfig = gradle.substringAfter("defaultConfig {").substringBefore("signingConfigs")
+        val release = gradle.substringAfter("release {").substringBefore("isMinifyEnabled")
+        // debug (= defaultConfig) keeps Google's test unit, release uses the real one
+        assertTrue(defaultConfig.contains("ca-app-pub-3940256099942544/6300978111"))
+        assertTrue(release.contains("ca-app-pub-5065513980633271/7996961312"))
+        assertTrue(!defaultConfig.contains("5065513980633271"))
     }
 }

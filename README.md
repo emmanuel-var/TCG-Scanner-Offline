@@ -142,10 +142,10 @@ Herramienta independiente y no oficial. Los nombres de juegos e imágenes perten
 ## Idioma, anuncios e icono
 
 - **Idioma**: Ajustes → *Idioma*. Español, inglés, francés, alemán, portugués, chino (simplificado), japonés, ruso e hindi, más «predeterminado del sistema». Usa `AppCompatDelegate.setApplicationLocales` (por eso `MainActivity` es `AppCompatActivity`): la interfaz cambia al instante, sin reiniciar, y el idioma se recuerda (en Android 13+ también aparece en los ajustes del sistema, gracias a `locales_config.xml`). Cada idioma tiene su `res/values-xx/strings.xml`; `LanguageResourcesTest` comprueba que todos tengan las mismas claves y marcadores (`%1$d`...).
-- **Anuncios (AdMob)**: un banner adaptativo anclado bajo la app (no tapa contenido). Antes de pedir ningún anuncio se ejecuta el formulario de consentimiento de **Google UMP**; en las regiones donde es obligatorio, Ajustes → *Publicidad* ofrece reabrirlo. Ahora mismo se usan los **IDs de prueba** de Google:
-  - App ID (`AndroidManifest.xml`): `ca-app-pub-3940256099942544~3347511713`
-  - Banner (`ADMOB_BANNER_UNIT_ID` en `app/build.gradle.kts`): `ca-app-pub-3940256099942544/6300978111`
-  - **Antes de publicar**: sustituye ambos por los de tu cuenta de AdMob, declara el *ID de publicidad* y los anuncios en Play Console (Contenido de la app → Anuncios / Seguridad de los datos) y enlaza tu política de privacidad.
+- **Anuncios (AdMob)**: un banner adaptativo anclado bajo la app (no tapa contenido). Antes de pedir ningún anuncio se ejecuta el formulario de consentimiento de **Google UMP**; en las regiones donde es obligatorio, Ajustes → *Publicidad* ofrece reabrirlo. IDs reales de AdMob:
+  - App ID (`AndroidManifest.xml`): `ca-app-pub-5065513980633271~5670180870`
+  - Banner (`ADMOB_BANNER_UNIT_ID` en `app/build.gradle.kts`): `ca-app-pub-5065513980633271/7996961312`, **solo en builds release**. Los builds debug usan el banner de prueba de Google (`ca-app-pub-3940256099942544/6300978111`) para que nunca cargues ni toques anuncios reales mientras desarrollas (podría suspenderse la cuenta).
+  - Declara el *ID de publicidad* y los anuncios en Play Console (Contenido de la app → Anuncios / Seguridad de los datos), enlaza tu política de privacidad y crea el mensaje de consentimiento (GDPR) en AdMob → Privacidad y mensajería.
 - **Icono**: `res/drawable-nodpi/ic_launcher_foreground.png` (adaptativo, fondo `#FF681C`) y versión monocromática en vector; el icono de 512 px para la ficha de Play Store está en `docs/store/ic_launcher_512.png`.
 
 ## Preparación automática al abrir la app
