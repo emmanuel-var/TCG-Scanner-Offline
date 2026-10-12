@@ -249,12 +249,11 @@
     <string name="open_settings">Abrir Ajustes</string>
     <string name="catalog_url_needed">Este juego aún no tiene fuente integrada. Pega el enlace .json de la comunidad (o un archivo de juego de Card Game Simulator) o importa un archivo.</string>
     <string name="section_scan_engine">Motor de escaneo</string>
-    <string name="scan_engine_explainer">Modelos opcionales en el dispositivo que hacen el escaneo más preciso: YOLO11n localiza y endereza la carta, PaddleOCR lee el código del set y EfficientNet-Lite0 identifica la ilustración cuando no hay número legible. El escaneo ya funciona sin ellos con ML Kit.</string>
-    <string name="scan_engine_prompt">Mejora la detección y lectura de cartas descargando el motor de escaneo (YOLO11n + PaddleOCR, unos 21 MB)</string>
+    <string name="scan_engine_explainer">Modelos opcionales en el dispositivo que hacen el escaneo más preciso: PaddleOCR lee el código de edición y EfficientNet-Lite0 identifica la ilustración cuando no hay un número legible. El escaneo ya funciona sin ellos con ML Kit.</string>
+    <string name="scan_engine_prompt">Mejora la lectura de cartas descargando el motor de escaneo (PaddleOCR, unos 15 MB)</string>
     <string name="scan_engine_downloading">Descargando motor de escaneo…</string>
     <string name="scan_guide_mode">Marco guía</string>
     <string name="scan_no_number_hint">No se encontró número de set. Prueba «Identificar por ilustración».</string>
-    <string name="pack_detector_name">Detector de cartas (YOLO11n)</string>
     <string name="pack_ocr_name">Lector de texto (PaddleOCR)</string>
     <string name="pack_ocr_ja_name">Lector de texto japonés (PaddleOCR)</string>
     <string name="pack_embedder_name">Motor de ilustraciones (EfficientNet-Lite0)</string>
@@ -282,6 +281,7 @@
     <string name="setup_collapse">Ocultar detalles</string>
     <string name="setup_dismiss">Cerrar</string>
     <string name="model_failed_not_found">Los archivos del motor no están disponibles en la dirección de descarga (el release debe ser público). Cambia la carpeta en Ajustes o inténtalo más tarde.</string>
+    <string name="scan_auto_frame">Carta detectada</string>
     <plurals name="cards_count">
         <item quantity="one">%d carta</item>
         <item quantity="other">%d cartas</item>

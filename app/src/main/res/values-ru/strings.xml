@@ -249,12 +249,11 @@
     <string name="open_settings">Открыть Настройки</string>
     <string name="catalog_url_needed">Для этой игры пока нет встроенного источника. Вставьте ссылку на .json сообщества (или файл игры Card Game Simulator) либо импортируйте файл.</string>
     <string name="section_scan_engine">Движок сканирования</string>
-    <string name="scan_engine_explainer">Необязательные модели на устройстве, повышающие точность сканирования: YOLO11n находит и выравнивает карту, PaddleOCR читает код сета, EfficientNet-Lite0 определяет рисунок, когда номер не читается. Сканирование и так работает без них через ML Kit.</string>
-    <string name="scan_engine_prompt">Улучшите обнаружение и чтение карт, скачав движок сканирования (YOLO11n + PaddleOCR, около 21 МБ)</string>
+    <string name="scan_engine_explainer">Необязательные модели на устройстве, повышающие точность сканирования: PaddleOCR читает код сета, а EfficientNet-Lite0 определяет рисунок, когда номер не читается. Сканирование и так работает без них через ML Kit.</string>
+    <string name="scan_engine_prompt">Улучшите чтение карт, скачав движок сканирования (PaddleOCR, около 15 МБ)</string>
     <string name="scan_engine_downloading">Загрузка движка сканирования…</string>
     <string name="scan_guide_mode">Направляющая рамка</string>
     <string name="scan_no_number_hint">Номер сета не найден. Попробуйте «Определить по рисунку».</string>
-    <string name="pack_detector_name">Детектор карт (YOLO11n)</string>
     <string name="pack_ocr_name">Чтение текста (PaddleOCR)</string>
     <string name="pack_ocr_ja_name">Чтение японского текста (PaddleOCR)</string>
     <string name="pack_embedder_name">Движок рисунков (EfficientNet-Lite0)</string>
@@ -282,6 +281,7 @@
     <string name="setup_collapse">Скрыть подробности</string>
     <string name="setup_dismiss">Закрыть</string>
     <string name="model_failed_not_found">Файлы движка недоступны по адресу загрузки (релиз должен быть публичным). Измените папку в Настройках или повторите попытку позже.</string>
+    <string name="scan_auto_frame">Карта найдена</string>
     <plurals name="cards_count">
         <item quantity="one">%d карта</item>
         <item quantity="few">%d карты</item>

@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicReference
  */
 class PipelineAnalyzer(
     private val pipeline: ScanPipeline,
-    /** Card guide as fractions of the preview; only used when the YOLO pack is not installed. */
+    /** Card guide as fractions of the preview; the area searched for the card edges. */
     private val guide: AtomicReference<RectF>,
     private val paused: AtomicBoolean,
     private val onFrame: (PipelineFrame) -> Unit,

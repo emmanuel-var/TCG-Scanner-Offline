@@ -56,8 +56,8 @@ class ModelStateTest {
     @Test fun packFilesAndUrls() {
         val ocr = com.tcgscanner.offline.scanner.EnginePacks.files(com.tcgscanner.offline.scanner.EnginePack.OCR).map { it.name }
         assertEquals(listOf("ocr_det.onnx", "ocr_rec.onnx", "ocr_dict.txt"), ocr)
-        val f = com.tcgscanner.offline.scanner.EnginePacks.files(com.tcgscanner.offline.scanner.EnginePack.DETECTOR).single()
-        assertEquals("https://example.com/m/card_detector.tflite", com.tcgscanner.offline.scanner.EnginePacks.urlFor("https://example.com/m", f))
-        assertEquals(com.tcgscanner.offline.scanner.EnginePacks.DEFAULT_BASE_URL + "card_detector.tflite", com.tcgscanner.offline.scanner.EnginePacks.urlFor("", f))
+        val f = com.tcgscanner.offline.scanner.EnginePacks.files(com.tcgscanner.offline.scanner.EnginePack.EMBEDDER).single()
+        assertEquals("https://example.com/m/card_embedder.tflite", com.tcgscanner.offline.scanner.EnginePacks.urlFor("https://example.com/m", f))
+        assertEquals(com.tcgscanner.offline.scanner.EnginePacks.DEFAULT_BASE_URL + "card_embedder.tflite", com.tcgscanner.offline.scanner.EnginePacks.urlFor("", f))
     }
 }

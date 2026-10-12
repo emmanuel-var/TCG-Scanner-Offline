@@ -83,18 +83,18 @@ La app **no pide claves de API ni usa servidores propios**. URLs por defecto (`d
 ## Escáner: pipeline híbrido en el dispositivo
 
 ```
-cámara ─► 1. YOLO11n (TFLite)        caja de la carta → refinado de esquinas → recorte con corrección de perspectiva
+cámara ─► 1. Bordes en el marco guía      (procesado de imagen puro: Sobel + Otsu + casco convexo) → recorte con corrección de perspectiva
         ─► 2. PaddleOCR-Mobile (ONNX) texto de la carta limpia → Regex del juego (p. ej. OP01-120) → Room (índices)
         ─► 3. EfficientNet-Lite0      solo si el usuario pulsa «Identificar por ilustración» → coseno sobre vectores en RAM
         ─► 4. Bottom sheet            la persona elige la variante (Normal / Holo / Reverse / 1.ª Edición…) y el estado o slab
 ```
 
-* **Degradación elegante.** Sin descargar nada la cámara ya lee: ML Kit (incluido en el APK) sobre el marco guía. Un aviso translúcido ofrece el *motor de escaneo* (YOLO11n + PaddleOCR, ~21 MB); después, el *motor visual* (EfficientNet-Lite0, ~13 MB). Cada motor se descarga con WorkManager (`ModelDownloadWorker`, reanudable, validado) y su `StateFlow` (`ModelRepository`) hace que el aviso desaparezca y el motor se cargue sin reiniciar (ver `docs/SCANNER_MODEL.md`).
-* **Fase 1** (`scanner/pipeline`): `YoloCardDetector` (letterbox + `YoloDecoder` + NMS) → `QuadRefiner` (Sobel + Otsu + casco convexo, sin OpenCV) → `PerspectiveCropper` (`Matrix.setPolyToPoly`) a 512×704. Si la carta está de lado o al revés, el siguiente fotograma prueba 180°. El contorno detectado se dibuja sobre la vista previa.
+* **Degradación elegante.** Sin descargar nada la cámara ya lee: ML Kit (incluido en el APK) sobre el marco guía. Un aviso translúcido ofrece el *motor de escaneo* (PaddleOCR, ~15 MB); después, el *motor visual* (EfficientNet-Lite0, ~13 MB). Cada motor se descarga con WorkManager (`ModelDownloadWorker`, reanudable, validado) y su `StateFlow` (`ModelRepository`) hace que el aviso desaparezca y el motor se cargue sin reiniciar (ver `docs/SCANNER_MODEL.md`).
+* **Fase 1** (`scanner/pipeline`): `QuadRefiner` (busca los bordes de la carta dentro del marco guía): Sobel + Otsu + casco convexo, sin OpenCV ni red neuronal → `PerspectiveCropper` (`Matrix.setPolyToPoly`) a 512×704. Si la carta está de lado o al revés, el siguiente fotograma prueba 180°. Solo se confía en el contorno si tiene proporciones de carta y ocupa al menos ~55 % del marco; si no, se recorta el marco guía. El contorno detectado se dibuja sobre la vista previa.
 * **Fase 2** (`scanner/paddle`): detector DB + reconocedor CTC con ONNX Runtime (`PaddleOcrEngine`, post-proceso en Kotlin puro: `DbPostProcessor`, `CtcDecoder`). `CardPatterns` define el Regex por juego (One Piece `[A-Z]{2}\d{2}-\d{3}` y variantes, Digimon, Yu-Gi-Oh!, Gundam, Fusion World, Riftbound, fracciones tipo `025/198`) y corrige confusiones O/0 e I/l/1 del OCR.
 * **Rendimiento de la búsqueda.** Todas las consultas de la cámara empiezan por `gameId`: `(gameId, setKey, numberKey)` para set+número, `(gameId, numberKey)`, `(gameId, nameKey)` para nombre exacto y *range scan* por prefijo; solo si no hay ningún candidato se hace un `LIKE '%…%'`. Los índices están declarados en la entidad (`CardEntity`, alias `CatalogCard`; columnas `game_id`=`gameId`, `set_number`=`setKey`, `card_number`=`numberKey`, `name`=`nameKey`) y hay migración Room 2→3.
 * **Fase 3 sin SQLite.** Al iniciar, `ScannerViewModel` carga en RAM (`viewModelScope`) los embeddings del juego activo en un `VectorIndex` (un único `FloatArray` contiguo, vectores normalizados); cada consulta es un recorrido con productos punto (coseno) y un top‑k, sin tocar la base de datos. Si no hay número legible tras varios fotogramas, el botón se promueve a acción principal.
-* **Modelos** (sin entrenar nada; `tools/model/`): `export_yolo_card_detector.py`, `prepare_ocr_pack.py`, `export_efficientnet_lite0.py`, `release_checksums.py`. Se publican como archivos de un release y se descargan desde Ajustes → Motor de escaneo (carpeta configurable).
+* **Modelos** (sin entrenar nada; `tools/model/`): `prepare_ocr_pack.py`, `export_efficientnet_lite0.py`, `release_checksums.py`. Se publican como archivos de un release y se descargan desde Ajustes → Motor de escaneo (carpeta configurable).
 
 ## Modelos (Python, sin entrenamiento)
 
@@ -129,7 +129,7 @@ El proyecto se escribió en un entorno sin Android SDK ni acceso a Google Maven,
 
 * compilación de `core`, `data/remote` (todas las fuentes), entidades, valoración, parser OCR y modelos de intercambio;
 * 68 pruebas (unitarias en `app/src/test` + integración ligera con respuestas simuladas): parser y Regex por juego, valoración, CSV, adaptadores de catálogo, llaves estables y re-vinculación, estados de los motores, geometría de la carta, decodificador YOLO (formatos y letterbox), post-proceso DB/CTC de PaddleOCR, índice vectorial en RAM, refinado de esquinas sobre imágenes sintéticas;
-* compilan contra los JAR reales de TensorFlow Lite, ONNX Runtime y Android: `YoloCardDetector`, `PaddleOcrEngine`, `PerspectiveCropper`, `ScanPipeline`;
+* compilan contra los JAR reales de TensorFlow Lite, ONNX Runtime y Android: `PaddleOcrEngine`, `PerspectiveCropper`, `ScanPipeline`;
 * `export_efficientnet_lite0.py` (ruta Keras) se ejecutó de punta a punta con TensorFlow 2.21 (pesos aleatorios: los repositorios de modelos no son accesibles aquí).
 
 Antes de publicar: compila en Android Studio, corrige cualquier error menor de API, y prueba en dispositivo real el escáner, el arrastrar y soltar, Nearby (dos teléfonos con Google Play Services) y las fuentes con red real.
@@ -150,4 +150,4 @@ Herramienta independiente y no oficial. Los nombres de juegos e imágenes perten
 
 ## Preparación automática al abrir la app
 
-Al abrir la app (`AppSetup`), se encolan en segundo plano los motores de escaneo (detector + OCR, y OCR japonés si hay un juego japonés activo), el motor de ilustraciones y el catálogo de cada juego activo que aún no tenga cartas. Una pequeña pestaña de progreso (`SetupStrip`, sobre el banner) muestra el avance, se puede expandir para ver cada descarga y desaparece al terminar. Respeta «Solo Wi-Fi» (con el botón *Usar datos móviles* para saltárselo) y ofrece *Reintentar* si algo falla; el escáner sigue funcionando con ML Kit mientras tanto. Los motores se descargan de `EnginePacks.DEFAULT_BASE_URL` (release `models-v1` del repositorio): **ese release debe existir con los archivos** para que la descarga funcione.
+Al abrir la app (`AppSetup`), se encolan en segundo plano los motores de escaneo (OCR, y OCR japonés si hay un juego japonés activo), el motor de ilustraciones y el catálogo de cada juego activo que aún no tenga cartas. Una pequeña pestaña de progreso (`SetupStrip`, sobre el banner) muestra el avance, se puede expandir para ver cada descarga y desaparece al terminar. Respeta «Solo Wi-Fi» (con el botón *Usar datos móviles* para saltárselo) y ofrece *Reintentar* si algo falla; el escáner sigue funcionando con ML Kit mientras tanto. Los motores se descargan de `EnginePacks.DEFAULT_BASE_URL` (release `models-v1` del repositorio): **ese release debe existir con los archivos** para que la descarga funcione.

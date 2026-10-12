@@ -249,12 +249,11 @@
     <string name="open_settings">Open Settings</string>
     <string name="catalog_url_needed">No built-in source for this game yet. Paste the community .json link (or a Card Game Simulator game file) or import a file.</string>
     <string name="section_scan_engine">Scan engine</string>
-    <string name="scan_engine_explainer">Optional on-device models that make scanning more precise: YOLO11n finds and straightens the card, PaddleOCR reads its set code, EfficientNet-Lite0 identifies artwork when there is no readable number. Scanning already works without them using ML Kit.</string>
-    <string name="scan_engine_prompt">Improve card detection and reading by downloading the scan engine (YOLO11n + PaddleOCR, about 21 MB)</string>
+    <string name="scan_engine_explainer">Optional on-device models that make scanning more precise: PaddleOCR reads the set code and EfficientNet-Lite0 identifies artwork when there is no readable number. Scanning already works without them using ML Kit.</string>
+    <string name="scan_engine_prompt">Improve card reading by downloading the scan engine (PaddleOCR, about 15 MB)</string>
     <string name="scan_engine_downloading">Downloading scan engine…</string>
     <string name="scan_guide_mode">Guide frame</string>
     <string name="scan_no_number_hint">No set number found. Try “Identify by artwork”.</string>
-    <string name="pack_detector_name">Card detector (YOLO11n)</string>
     <string name="pack_ocr_name">Text reader (PaddleOCR)</string>
     <string name="pack_ocr_ja_name">Japanese text reader (PaddleOCR)</string>
     <string name="pack_embedder_name">Artwork engine (EfficientNet-Lite0)</string>
@@ -282,6 +281,7 @@
     <string name="setup_collapse">Hide details</string>
     <string name="setup_dismiss">Dismiss</string>
     <string name="model_failed_not_found">The engine files are not available at the download address (the release must be public). Change the folder in Settings or try again later.</string>
+    <string name="scan_auto_frame">Card found</string>
     <plurals name="cards_count">
         <item quantity="one">%d card</item>
         <item quantity="other">%d cards</item>

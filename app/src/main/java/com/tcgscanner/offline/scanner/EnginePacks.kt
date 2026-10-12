@@ -4,13 +4,10 @@ import java.io.File
 
 /** The optional downloadable engines of the scan pipeline. Each is a set of plain files in Context.filesDir. */
 enum class EnginePack(val id: String) {
-    /** Phase 1: YOLO11n card detector (TFLite). */
-    DETECTOR("detector"),
-
     /** Phase 2: PaddleOCR-Mobile text detector + Latin recogniser + dictionary (ONNX). */
     OCR("ocr"),
 
-    /** Phase 2 for Japanese cards: recogniser + dictionary (shares the detector of [OCR]). */
+    /** Phase 2 for Japanese cards: recogniser + dictionary (shares the text detector of [OCR]). */
     OCR_JA("ocr_ja"),
 
     /** Phase 3: EfficientNet-Lite0 feature extractor for "identify by artwork" (TFLite). */
@@ -35,7 +32,6 @@ object EnginePacks {
      */
     const val DEFAULT_BASE_URL = "https://github.com/emmanuel-var/TCG-Scanner-Offline/releases/download/models-v1/"
 
-    const val DETECTOR_FILE = "card_detector.tflite"
     const val OCR_DET_FILE = "ocr_det.onnx"
     const val OCR_REC_FILE = "ocr_rec.onnx"
     const val OCR_DICT_FILE = "ocr_dict.txt"
@@ -44,7 +40,6 @@ object EnginePacks {
     const val EMBEDDER_FILE = "card_embedder.tflite"
 
     fun files(pack: EnginePack): List<PackFile> = when (pack) {
-        EnginePack.DETECTOR -> listOf(PackFile(DETECTOR_FILE, 6.0, 500_000))
         EnginePack.OCR -> listOf(
             PackFile(OCR_DET_FILE, 4.7, 1_000_000), PackFile(OCR_REC_FILE, 10.0, 1_000_000), PackFile(OCR_DICT_FILE, 0.03, 100)
         )

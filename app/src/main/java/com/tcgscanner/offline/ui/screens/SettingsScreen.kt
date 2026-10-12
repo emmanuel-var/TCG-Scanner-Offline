@@ -138,7 +138,7 @@ class SettingsViewModel(private val c: AppContainer) : ViewModel() {
     }
 
     // ---- scan engine packs -----------------------------------------------------------------------------
-    /** State of every downloadable pack (YOLO detector, PaddleOCR, Japanese OCR, EfficientNet-Lite0). */
+    /** State of every downloadable pack (PaddleOCR, Japanese OCR, EfficientNet-Lite0). */
     val packStates: StateFlow<Map<EnginePack, ModelState>> = kotlinx.coroutines.flow.combine(
         EnginePack.entries.map { pack -> c.packs.getValue(pack).state }
     ) { states -> EnginePack.entries.zip(states.toList()).toMap() }
@@ -362,7 +362,7 @@ fun SettingsScreen(nav: NavController, onBack: () -> Unit) {
                 if (s.activeGames.isEmpty()) Text(stringResource(R.string.hub_empty_message), style = MaterialTheme.typography.bodyMedium)
             }
 
-            // ---- Scan engine packs (YOLO11n + PaddleOCR + EfficientNet-Lite0) -----------------------------------------
+            // ---- Scan engine packs (PaddleOCR + EfficientNet-Lite0) -----------------------------------------
             Section(stringResource(R.string.section_scan_engine)) {
                 Text(stringResource(R.string.scan_engine_explainer), style = MaterialTheme.typography.bodyMedium)
                 EnginePack.entries.forEach { pack ->
@@ -494,7 +494,6 @@ private fun CatalogUrlRow(
 private fun PackRow(pack: EnginePack, state: ModelState, onDownload: () -> Unit, onDelete: () -> Unit) {
     val name = stringResource(
         when (pack) {
-            EnginePack.DETECTOR -> R.string.pack_detector_name
             EnginePack.OCR -> R.string.pack_ocr_name
             EnginePack.OCR_JA -> R.string.pack_ocr_ja_name
             EnginePack.EMBEDDER -> R.string.pack_embedder_name

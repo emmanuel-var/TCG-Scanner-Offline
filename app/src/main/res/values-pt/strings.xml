@@ -249,12 +249,11 @@
     <string name="open_settings">Abrir Configurações</string>
     <string name="catalog_url_needed">Ainda não há fonte integrada para este jogo. Cole o link .json da comunidade (ou um arquivo de jogo do Card Game Simulator) ou importe um arquivo.</string>
     <string name="section_scan_engine">Mecanismo de escaneamento</string>
-    <string name="scan_engine_explainer">Modelos opcionais no dispositivo que tornam o escaneamento mais preciso: o YOLO11n encontra e endireita a carta, o PaddleOCR lê o código do set, o EfficientNet-Lite0 identifica a arte quando não há número legível. O escaneamento já funciona sem eles usando o ML Kit.</string>
-    <string name="scan_engine_prompt">Melhore a detecção e a leitura de cartas baixando o mecanismo de escaneamento (YOLO11n + PaddleOCR, cerca de 21 MB)</string>
+    <string name="scan_engine_explainer">Modelos opcionais no dispositivo que tornam o escaneamento mais preciso: o PaddleOCR lê o código do set e o EfficientNet-Lite0 identifica a arte quando não há número legível. O escaneamento já funciona sem eles usando o ML Kit.</string>
+    <string name="scan_engine_prompt">Melhore a leitura de cartas baixando o mecanismo de escaneamento (PaddleOCR, cerca de 15 MB)</string>
     <string name="scan_engine_downloading">Baixando mecanismo de escaneamento…</string>
     <string name="scan_guide_mode">Moldura-guia</string>
     <string name="scan_no_number_hint">Nenhum número de set encontrado. Tente “Identificar pela arte”.</string>
-    <string name="pack_detector_name">Detector de cartas (YOLO11n)</string>
     <string name="pack_ocr_name">Leitor de texto (PaddleOCR)</string>
     <string name="pack_ocr_ja_name">Leitor de texto japonês (PaddleOCR)</string>
     <string name="pack_embedder_name">Mecanismo de artes (EfficientNet-Lite0)</string>
@@ -282,6 +281,7 @@
     <string name="setup_collapse">Ocultar detalhes</string>
     <string name="setup_dismiss">Dispensar</string>
     <string name="model_failed_not_found">Os arquivos do mecanismo não estão disponíveis no endereço de download (o release precisa ser público). Altere a pasta em Configurações ou tente mais tarde.</string>
+    <string name="scan_auto_frame">Carta detectada</string>
     <plurals name="cards_count">
         <item quantity="one">%d carta</item>
         <item quantity="many">%d de cartas</item>

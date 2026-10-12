@@ -7,7 +7,7 @@ import hashlib
 import sys
 from pathlib import Path
 
-NAMES = ["card_detector.tflite", "ocr_det.onnx", "ocr_rec.onnx", "ocr_dict.txt", "ocr_rec_japan.onnx", "ocr_dict_japan.txt", "card_embedder.tflite"]
+NAMES = ["ocr_det.onnx", "ocr_rec.onnx", "ocr_dict.txt", "ocr_rec_japan.onnx", "ocr_dict_japan.txt", "card_embedder.tflite"]
 
 folder = Path(sys.argv[1] if len(sys.argv) > 1 else "build")
 for name in NAMES:

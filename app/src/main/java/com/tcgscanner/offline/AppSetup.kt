@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
 
 /**
  * First-run (and "new game added") preparation. As soon as the app opens it queues, once per process:
- *  - the scan engines (card detector + OCR [+ Japanese OCR when a Japanese game is active]) and the artwork engine,
+ *  - the scan engines (OCR [+ Japanese OCR when a Japanese game is active]) and the artwork engine,
  *  - the catalog of every active game that has a source and no cards yet,
  * so a user never opens the scanner to find nothing installed. [summary] feeds the small progress strip.
  *
@@ -93,7 +93,7 @@ class AppSetup(
     }
 
     private fun neededPacks(games: Set<GameId>): List<EnginePack> = buildList {
-        add(EnginePack.DETECTOR); add(EnginePack.OCR); add(EnginePack.EMBEDDER)
+        add(EnginePack.OCR); add(EnginePack.EMBEDDER)
         if (games.any { Games[it].ocrScript == OcrScript.JAPANESE }) add(EnginePack.OCR_JA)
     }
 
@@ -114,7 +114,7 @@ class AppSetup(
     val summary: StateFlow<SetupSummary> = combine(settings.settings, packStates, counts, sync.state, unmeteredNetwork()) { cfg, states, count, syncState, unmetered ->
         val games = cfg.activeGames.sortedBy { it.ordinal }
         val scanPacks = buildList {
-            add(EnginePack.DETECTOR); add(EnginePack.OCR)
+            add(EnginePack.OCR)
             if (games.any { Games[it].ocrScript == OcrScript.JAPANESE }) add(EnginePack.OCR_JA)
         }
         val items = ArrayList<SetupItem>()

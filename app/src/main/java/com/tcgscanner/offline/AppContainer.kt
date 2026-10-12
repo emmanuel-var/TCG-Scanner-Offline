@@ -25,7 +25,6 @@ import com.tcgscanner.offline.scanner.EnginePack
 import com.tcgscanner.offline.scanner.EnginePacks
 import com.tcgscanner.offline.scanner.ModelRepository
 import com.tcgscanner.offline.scanner.paddle.PaddleOcrEngine
-import com.tcgscanner.offline.scanner.pipeline.YoloCardDetector
 import com.tcgscanner.offline.scanner.ScanMatcher
 import com.tcgscanner.offline.scanner.TfliteEmbedder
 import com.tcgscanner.offline.scanner.VisualIndexer
@@ -71,7 +70,6 @@ class AppContainer(val app: Application) {
 
     // ---- scan pipeline engines (each loads from filesDir once its pack is installed) --------------------------------
     private val files get() = app.filesDir
-    val detector by lazy { YoloCardDetector(File(files, EnginePacks.DETECTOR_FILE)) }
     val paddleOcr by lazy { PaddleOcrEngine(File(files, EnginePacks.OCR_DET_FILE), File(files, EnginePacks.OCR_REC_FILE), File(files, EnginePacks.OCR_DICT_FILE)) }
     val paddleOcrJa by lazy { PaddleOcrEngine(File(files, EnginePacks.OCR_DET_FILE), File(files, EnginePacks.OCR_REC_JA_FILE), File(files, EnginePacks.OCR_DICT_JA_FILE)) }
     val embedder by lazy { TfliteEmbedder(File(files, EnginePacks.EMBEDDER_FILE)) }
@@ -83,7 +81,6 @@ class AppContainer(val app: Application) {
                 app, scope, settings, pack,
                 onInstalled = {
                     when (pack) {
-                        EnginePack.DETECTOR -> detector.reload()
                         EnginePack.OCR -> paddleOcr.reload().also { if (EnginePacks.isInstalled(files, EnginePack.OCR_JA)) paddleOcrJa.reload() }
                         EnginePack.OCR_JA -> paddleOcrJa.reload()
                         EnginePack.EMBEDDER -> embedder.reload()
@@ -91,7 +88,6 @@ class AppContainer(val app: Application) {
                 },
                 onRemoved = {
                     when (pack) {
-                        EnginePack.DETECTOR -> detector.unload()
                         EnginePack.OCR -> { paddleOcr.unload(); paddleOcrJa.unload() }
                         EnginePack.OCR_JA -> paddleOcrJa.unload()
                         EnginePack.EMBEDDER -> embedder.unload()

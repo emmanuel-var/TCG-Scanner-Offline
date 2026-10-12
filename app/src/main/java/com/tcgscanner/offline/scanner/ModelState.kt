@@ -28,7 +28,7 @@ object ModelStateResolver {
     }
 }
 
-/** Folds the states of several packs into the one the UI shows ("scan engine" = detector + OCR). */
+/** Folds the states of several packs into the one the UI shows ("scan engine" = the OCR packs). */
 fun aggregateModelStates(states: List<ModelState>): ModelState = when {
     states.isEmpty() -> ModelState.Ready
     states.any { it is ModelState.Downloading } -> {

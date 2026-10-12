@@ -6,7 +6,7 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * Finds the card's four corners inside the box YOLO returned, so a card held at an angle can be rectified.
+ * Finds the card's four corners inside the guide area, so a card held at an angle can be rectified.
  * Pure Kotlin on a luminance array (no OpenCV): Sobel edges -> Otsu threshold -> convex hull of strong edge
  * pixels -> extreme points along both diagonals.
  */
@@ -14,7 +14,7 @@ object QuadRefiner {
 
     /**
      * @param gray luminance 0..255, row-major, [width] x [height]
-     * @param box search window inside the image (the detector box, slightly enlarged by the caller)
+     * @param box search window inside the image (the guide area, slightly enlarged by the caller)
      * @return corners in image coordinates, or null when no card-shaped quadrilateral is found
      */
     fun refine(gray: IntArray, width: Int, height: Int, box: FloatArray): Quad? {

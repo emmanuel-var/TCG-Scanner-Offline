@@ -249,12 +249,11 @@
     <string name="open_settings">設定を開く</string>
     <string name="catalog_url_needed">このゲームにはまだ内蔵の情報源がありません。コミュニティの .json リンク（または Card Game Simulator のゲームファイル）を貼り付けるか、ファイルをインポートしてください。</string>
     <string name="section_scan_engine">スキャンエンジン</string>
-    <string name="scan_engine_explainer">スキャンをより正確にする、端末上のオプションのモデルです。YOLO11n がカードを見つけて補正し、PaddleOCR がセットコードを読み取り、EfficientNet-Lite0 が読める番号がないときにイラストを識別します。これらがなくても、ML Kit でスキャンは動作します。</string>
-    <string name="scan_engine_prompt">スキャンエンジン（YOLO11n + PaddleOCR、約 21 MB）をダウンロードして、カードの検出と読み取りを改善しましょう</string>
+    <string name="scan_engine_explainer">スキャンをより正確にする、端末上のオプションのモデルです。PaddleOCR がセットコードを読み取り、EfficientNet-Lite0 が読める番号がないときにイラストを識別します。これらがなくても、ML Kit でスキャンは動作します。</string>
+    <string name="scan_engine_prompt">スキャンエンジン（PaddleOCR、約 15 MB）をダウンロードして、カードの読み取りを改善しましょう</string>
     <string name="scan_engine_downloading">スキャンエンジンをダウンロード中…</string>
     <string name="scan_guide_mode">ガイド枠</string>
     <string name="scan_no_number_hint">セット番号が見つかりません。「イラストで識別」をお試しください。</string>
-    <string name="pack_detector_name">カード検出（YOLO11n）</string>
     <string name="pack_ocr_name">文字読み取り（PaddleOCR）</string>
     <string name="pack_ocr_ja_name">日本語文字読み取り（PaddleOCR）</string>
     <string name="pack_embedder_name">イラストエンジン（EfficientNet-Lite0）</string>
@@ -282,6 +281,7 @@
     <string name="setup_collapse">詳細を非表示</string>
     <string name="setup_dismiss">閉じる</string>
     <string name="model_failed_not_found">ダウンロード先でエンジンのファイルを取得できません（リリースは公開されている必要があります）。設定でフォルダを変更するか、後でもう一度お試しください。</string>
+    <string name="scan_auto_frame">カードを検出</string>
     <plurals name="cards_count">
         <item quantity="other">%d 枚</item>
     </plurals>

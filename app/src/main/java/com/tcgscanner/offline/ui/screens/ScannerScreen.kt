@@ -257,7 +257,7 @@ private fun CameraSection(
             drawRoundRect(line, r, s, CornerRadius(16.dp.toPx()), style = Stroke(width = 3.dp.toPx()))
         }
 
-        // Phase 1 feedback: the card outline YOLO found (after corner refinement), drawn over the live preview.
+        // Phase 1 feedback: the card outline found in the guide area, drawn over the live preview.
         val outline = ui.outline
         if (outline != null) {
             val accent = Color(0xFF4DD58A)
@@ -280,7 +280,7 @@ private fun CameraSection(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Non-intrusive notice: the camera and OCR are already live; this only offers the optional engine.
-            // The scan engine (YOLO + PaddleOCR) is offered first; the artwork engine only once that one is in place.
+            // The scan engine (PaddleOCR) is offered first; the artwork engine only once that one is in place.
             AnimatedVisibility(
                 visible = scanEngine !is ModelState.Ready,
                 enter = fadeIn() + expandVertically(),
@@ -310,7 +310,7 @@ private fun CameraSection(
             if (ui.engine.isNotEmpty()) {
                 Surface(shape = RoundedCornerShape(12.dp), color = Color.Black.copy(alpha = 0.5f)) {
                     Text(
-                        (if (ui.detected) "YOLO11n" else stringResource(R.string.scan_guide_mode)) + " · " + ui.engine,
+                        (if (ui.detected) stringResource(R.string.scan_auto_frame) else stringResource(R.string.scan_guide_mode)) + " · " + ui.engine,
                         Modifier.padding(horizontal = 10.dp, vertical = 3.dp), color = Color.White, style = MaterialTheme.typography.labelLarge
                     )
                 }
@@ -361,9 +361,9 @@ private fun CameraPreview(
                 OcrScript.LATIN -> TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             }
         )
-        // Hybrid pipeline: YOLO11n (if installed) -> rectified card -> PaddleOCR (if installed) else ML Kit.
+        // Hybrid pipeline: edge search in the guide area -> rectified card -> PaddleOCR (if installed) else ML Kit.
         // The engine is picked per frame, so a pack that finishes downloading takes over without restarting the camera.
-        val pipeline = ScanPipeline(container.detector) {
+        val pipeline = ScanPipeline {
             val paddle = if (game.ocrScript == OcrScript.JAPANESE) container.paddleOcrJa else container.paddleOcr
             if (paddle.isAvailable) paddle else mlKit
         }

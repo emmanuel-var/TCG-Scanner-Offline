@@ -249,12 +249,11 @@
     <string name="open_settings">Ouvrir les Paramètres</string>
     <string name="catalog_url_needed">Aucune source intégrée pour ce jeu pour l\'instant. Collez le lien .json communautaire (ou un fichier de jeu Card Game Simulator) ou importez un fichier.</string>
     <string name="section_scan_engine">Moteur de scan</string>
-    <string name="scan_engine_explainer">Modèles facultatifs sur l\'appareil qui rendent le scan plus précis : YOLO11n trouve et redresse la carte, PaddleOCR lit le code de l\'extension, EfficientNet-Lite0 identifie l\'illustration quand aucun numéro n\'est lisible. Le scan fonctionne déjà sans eux avec ML Kit.</string>
-    <string name="scan_engine_prompt">Améliorez la détection et la lecture des cartes en téléchargeant le moteur de scan (YOLO11n + PaddleOCR, environ 21 Mo)</string>
+    <string name="scan_engine_explainer">Modèles facultatifs sur l\'appareil qui rendent le scan plus précis : PaddleOCR lit le code de l\'extension et EfficientNet-Lite0 identifie l\'illustration quand aucun numéro n\'est lisible. Le scan fonctionne déjà sans eux avec ML Kit.</string>
+    <string name="scan_engine_prompt">Améliorez la lecture des cartes en téléchargeant le moteur de scan (PaddleOCR, environ 15 Mo)</string>
     <string name="scan_engine_downloading">Téléchargement du moteur de scan…</string>
     <string name="scan_guide_mode">Cadre de guidage</string>
     <string name="scan_no_number_hint">Aucun numéro d\'extension trouvé. Essayez « Identifier par l\'illustration ».</string>
-    <string name="pack_detector_name">Détecteur de cartes (YOLO11n)</string>
     <string name="pack_ocr_name">Lecteur de texte (PaddleOCR)</string>
     <string name="pack_ocr_ja_name">Lecteur de texte japonais (PaddleOCR)</string>
     <string name="pack_embedder_name">Moteur d\'illustrations (EfficientNet-Lite0)</string>
@@ -282,6 +281,7 @@
     <string name="setup_collapse">Masquer les détails</string>
     <string name="setup_dismiss">Fermer</string>
     <string name="model_failed_not_found">Les fichiers du moteur ne sont pas disponibles à l\'adresse de téléchargement (la release doit être publique). Changez le dossier dans les Paramètres ou réessayez plus tard.</string>
+    <string name="scan_auto_frame">Carte détectée</string>
     <plurals name="cards_count">
         <item quantity="one">%d carte</item>
         <item quantity="many">%d de cartes</item>

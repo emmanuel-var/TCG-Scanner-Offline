@@ -42,7 +42,7 @@ data class ScannerUi(
     val artworkBusy: Boolean = false,
     val addedName: String? = null,
     val liveGuess: String? = null,
-    /** Card outline from the YOLO detector, normalised to the preview; null when the guide frame is in use. */
+    /** Card outline found in the guide area, normalised to the preview; null when the guide frame is in use. */
     val outline: Quad? = null,
     val detected: Boolean = false,
     val engine: String = "",
@@ -72,10 +72,10 @@ class ScannerViewModel(private val c: AppContainer) : ViewModel() {
 
     // ---- engine packs ---------------------------------------------------------------------------------------
 
-    /** Packs the scan pipeline uses for [game]: detector + the matching OCR. */
+    /** Packs the scan pipeline uses for [game]: the matching OCR. */
     private fun scanPacks(game: GameId): List<EnginePack> =
-        if (Games[game].ocrScript == OcrScript.JAPANESE) listOf(EnginePack.DETECTOR, EnginePack.OCR, EnginePack.OCR_JA)
-        else listOf(EnginePack.DETECTOR, EnginePack.OCR)
+        if (Games[game].ocrScript == OcrScript.JAPANESE) listOf(EnginePack.OCR, EnginePack.OCR_JA)
+        else listOf(EnginePack.OCR)
 
     /** Detector + OCR packs of the active game, folded into one state: Missing -> Downloading(progress) -> Ready. */
     @OptIn(ExperimentalCoroutinesApi::class)

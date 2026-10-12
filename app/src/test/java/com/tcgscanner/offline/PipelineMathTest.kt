@@ -5,12 +5,9 @@ import com.tcgscanner.offline.scanner.paddle.CtcDecoder
 import com.tcgscanner.offline.scanner.paddle.DbPostProcessor
 import com.tcgscanner.offline.scanner.paddle.PaddleCharset
 import com.tcgscanner.offline.scanner.pipeline.CardGeometry
-import com.tcgscanner.offline.scanner.pipeline.Detection
-import com.tcgscanner.offline.scanner.pipeline.Letterbox
 import com.tcgscanner.offline.scanner.pipeline.Pt
 import com.tcgscanner.offline.scanner.pipeline.Quad
 import com.tcgscanner.offline.scanner.pipeline.QuadRefiner
-import com.tcgscanner.offline.scanner.pipeline.YoloDecoder
 import com.tcgscanner.offline.core.Text
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -79,48 +76,6 @@ class PipelineMathTest {
         val gray = IntArray(200 * 200) { rnd.nextInt(256) }
         // Random speckle has no card-shaped hull of strong edges that is not just the box; must not crash.
         QuadRefiner.refine(gray, 200, 200, floatArrayOf(5f, 5f, 195f, 195f))
-    }
-
-    // ---- YOLO decoding ---------------------------------------------------------------------------------------
-
-    private fun channelsFirst(anchors: Int, vararg boxes: FloatArray): FloatArray {
-        val out = FloatArray(5 * anchors)           // [cx, cy, w, h, score] x anchors
-        boxes.forEachIndexed { i, b -> for (c in 0 until 5) out[c * anchors + i] = b[c] }
-        return out
-    }
-
-    @Test fun decodesNormalisedChannelsFirstOutputThroughLetterbox() {
-        // Frame 1080x1920 letterboxed into 640: scale 1/3, pad x = 140. Card box centred at frame (540, 960), 600x840.
-        val lb = Letterbox(1080, 1920, 640)
-        val cx = (540f * lb.scale + lb.padX) / 640f; val cy = (960f * lb.scale + lb.padY) / 640f
-        val w = 600f * lb.scale / 640f; val h = 840f * lb.scale / 640f
-        val out = channelsFirst(100, floatArrayOf(cx, cy, w, h, 0.9f), floatArrayOf(0.1f, 0.1f, 0.05f, 0.05f, 0.1f))
-        val d = YoloDecoder.decode(out, intArrayOf(1, 5, 100), lb)
-        assertEquals(1, d.size)
-        assertEquals(240f, d[0].left, 1.5f); assertEquals(840f, d[0].right, 1.5f)
-        assertEquals(540f, d[0].top, 1.5f); assertEquals(1380f, d[0].bottom, 1.5f)
-    }
-
-    @Test fun decodesPixelUnitTransposedOutput() {
-        val lb = Letterbox(640, 640, 640)
-        val anchors = 50
-        val out = FloatArray(anchors * 5)                    // [anchors, 5]
-        out[7 * 5 + 0] = 320f; out[7 * 5 + 1] = 320f; out[7 * 5 + 2] = 200f; out[7 * 5 + 3] = 280f; out[7 * 5 + 4] = 0.8f
-        val d = YoloDecoder.decode(out, intArrayOf(1, anchors, 5), lb)
-        assertEquals(1, d.size); assertEquals(220f, d[0].left, 0.5f); assertEquals(180f, d[0].top, 0.5f)
-    }
-
-    @Test fun nonMaxSuppressionKeepsTheBestOfOverlappingBoxes() {
-        val a = Detection(0f, 0f, 100f, 140f, 0.9f)
-        val b = Detection(5f, 5f, 105f, 145f, 0.6f)
-        val c = Detection(300f, 300f, 400f, 440f, 0.7f)
-        val kept = YoloDecoder.nms(listOf(b, c, a), 0.45f)
-        assertEquals(listOf(a, c), kept)
-    }
-
-    @Test fun nothingBelowTheThresholdIsReturned() {
-        val out = channelsFirst(20, floatArrayOf(0.5f, 0.5f, 0.3f, 0.4f, 0.2f))
-        assertTrue(YoloDecoder.decode(out, intArrayOf(1, 5, 20), Letterbox(640, 640, 640)).isEmpty())
     }
 
     // ---- PaddleOCR post-processing -----------------------------------------------------------------------------

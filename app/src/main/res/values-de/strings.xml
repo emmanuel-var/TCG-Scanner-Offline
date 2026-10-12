@@ -249,12 +249,11 @@
     <string name="open_settings">Einstellungen öffnen</string>
     <string name="catalog_url_needed">Für dieses Spiel gibt es noch keine eingebaute Quelle. Füge den Community-.json-Link (oder eine Card-Game-Simulator-Spieldatei) ein oder importiere eine Datei.</string>
     <string name="section_scan_engine">Scan-Engine</string>
-    <string name="scan_engine_explainer">Optionale Modelle auf dem Gerät, die das Scannen genauer machen: YOLO11n findet und richtet die Karte aus, PaddleOCR liest ihren Set-Code, EfficientNet-Lite0 erkennt das Artwork, wenn keine lesbare Nummer vorhanden ist. Das Scannen funktioniert auch ohne sie mit ML Kit.</string>
-    <string name="scan_engine_prompt">Verbessere Kartenerkennung und -lesen, indem du die Scan-Engine herunterlädst (YOLO11n + PaddleOCR, ca. 21 MB)</string>
+    <string name="scan_engine_explainer">Optionale Modelle auf dem Gerät, die das Scannen genauer machen: PaddleOCR liest den Set-Code und EfficientNet-Lite0 erkennt das Artwork, wenn keine lesbare Nummer vorhanden ist. Das Scannen funktioniert auch ohne sie mit ML Kit.</string>
+    <string name="scan_engine_prompt">Verbessere das Kartenlesen, indem du die Scan-Engine herunterlädst (PaddleOCR, ca. 15 MB)</string>
     <string name="scan_engine_downloading">Scan-Engine wird heruntergeladen…</string>
     <string name="scan_guide_mode">Führungsrahmen</string>
     <string name="scan_no_number_hint">Keine Setnummer gefunden. Versuche „Per Artwork erkennen“.</string>
-    <string name="pack_detector_name">Kartenerkennung (YOLO11n)</string>
     <string name="pack_ocr_name">Textleser (PaddleOCR)</string>
     <string name="pack_ocr_ja_name">Japanischer Textleser (PaddleOCR)</string>
     <string name="pack_embedder_name">Artwork-Engine (EfficientNet-Lite0)</string>
@@ -282,6 +281,7 @@
     <string name="setup_collapse">Details ausblenden</string>
     <string name="setup_dismiss">Schließen</string>
     <string name="model_failed_not_found">Die Engine-Dateien sind unter der Download-Adresse nicht verfügbar (das Release muss öffentlich sein). Ändere den Ordner in den Einstellungen oder versuche es später erneut.</string>
+    <string name="scan_auto_frame">Karte erkannt</string>
     <plurals name="cards_count">
         <item quantity="one">%d Karte</item>
         <item quantity="other">%d Karten</item>
