@@ -39,12 +39,21 @@ object EnginePacks {
     const val OCR_DICT_JA_FILE = "ocr_dict_japan.txt"
     const val EMBEDDER_FILE = "card_embedder.tflite"
 
+    // SHA-256 of the files published in the models-v1 release (verified on download). If you republish a file,
+    // run tools/model/release_checksums.py and update the value here, or the download is rejected as corrupt.
     fun files(pack: EnginePack): List<PackFile> = when (pack) {
         EnginePack.OCR -> listOf(
-            PackFile(OCR_DET_FILE, 4.7, 1_000_000), PackFile(OCR_REC_FILE, 10.0, 1_000_000), PackFile(OCR_DICT_FILE, 0.03, 100)
+            PackFile(OCR_DET_FILE, 4.7, 1_000_000, "ab2a50dcd2c340852f2d0fbfa547d5eec79a0d04a774eb0b622d96d0d9d2ceeb"),
+            PackFile(OCR_REC_FILE, 10.0, 1_000_000, "40c07c5e431a4c59d7b5a1fefdba2fddb962c939d626c4dbf1d32965ab533431"),
+            PackFile(OCR_DICT_FILE, 0.03, 100, "5662df9d2d03f0e8ca0d3b0649d6acbab904b6a14b3d3521463c71c37c668ce3")
         )
-        EnginePack.OCR_JA -> listOf(PackFile(OCR_REC_JA_FILE, 11.0, 1_000_000), PackFile(OCR_DICT_JA_FILE, 0.1, 100))
-        EnginePack.EMBEDDER -> listOf(PackFile(EMBEDDER_FILE, 13.0, 1_000_000))
+        EnginePack.OCR_JA -> listOf(
+            PackFile(OCR_REC_JA_FILE, 11.0, 1_000_000, "da59d4dbb6786a92a3823c32b3f48179d18e29903d61462842aad9eb422a77a1"),
+            PackFile(OCR_DICT_JA_FILE, 0.1, 100, "1dcfcb41eec90576a945b3084f22ade11ced506e24f14879245b071698f308e8")
+        )
+        EnginePack.EMBEDDER -> listOf(
+            PackFile(EMBEDDER_FILE, 13.0, 1_000_000, "f5a287313dee5600e6cf28e7865b4959a6fb0e95ff11a523a50cf17fa200796c")
+        )
     }
 
     fun approxMb(pack: EnginePack): Int = Math.ceil(files(pack).sumOf { it.approxMb }).toInt()
