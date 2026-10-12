@@ -281,6 +281,7 @@
     <string name="setup_expand">Mostrar detalhes</string>
     <string name="setup_collapse">Ocultar detalhes</string>
     <string name="setup_dismiss">Dispensar</string>
+    <string name="model_failed_not_found">Os arquivos do mecanismo não estão disponíveis no endereço de download (o release precisa ser público). Altere a pasta em Configurações ou tente mais tarde.</string>
     <plurals name="cards_count">
         <item quantity="one">%d carta</item>
         <item quantity="many">%d de cartas</item>

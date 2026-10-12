@@ -281,6 +281,7 @@
     <string name="setup_expand">显示详情</string>
     <string name="setup_collapse">隐藏详情</string>
     <string name="setup_dismiss">关闭</string>
+    <string name="model_failed_not_found">下载地址上没有可用的引擎文件（发布版本必须是公开的）。请在设置中更改文件夹，或稍后重试。</string>
     <plurals name="cards_count">
         <item quantity="other">%d 张</item>
     </plurals>

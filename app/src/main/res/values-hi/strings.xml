@@ -281,6 +281,7 @@
     <string name="setup_expand">विवरण दिखाएँ</string>
     <string name="setup_collapse">विवरण छिपाएँ</string>
     <string name="setup_dismiss">बंद करें</string>
+    <string name="model_failed_not_found">डाउनलोड पते पर इंजन फ़ाइलें उपलब्ध नहीं हैं (रिलीज़ सार्वजनिक होना ज़रूरी है)। सेटिंग्स में फ़ोल्डर बदलें या बाद में फिर कोशिश करें।</string>
     <plurals name="cards_count">
         <item quantity="one">%d कार्ड</item>
         <item quantity="other">%d कार्ड</item>

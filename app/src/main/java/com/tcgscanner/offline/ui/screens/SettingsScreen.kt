@@ -517,7 +517,7 @@ private fun PackRow(pack: EnginePack, state: ModelState, onDownload: () -> Unit,
             val p = state.progress
             if (p != null) LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
-        if (state is ModelState.Failed) Text(stringResource(R.string.model_failed), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+        if (state is ModelState.Failed) Text(com.tcgscanner.offline.ui.components.modelFailureText(state), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         if (state is ModelState.Ready) Text(stringResource(R.string.model_ready), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
     }
 }

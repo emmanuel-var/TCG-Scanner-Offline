@@ -281,6 +281,7 @@
     <string name="setup_expand">詳細を表示</string>
     <string name="setup_collapse">詳細を非表示</string>
     <string name="setup_dismiss">閉じる</string>
+    <string name="model_failed_not_found">ダウンロード先でエンジンのファイルを取得できません（リリースは公開されている必要があります）。設定でフォルダを変更するか、後でもう一度お試しください。</string>
     <plurals name="cards_count">
         <item quantity="other">%d 枚</item>
     </plurals>

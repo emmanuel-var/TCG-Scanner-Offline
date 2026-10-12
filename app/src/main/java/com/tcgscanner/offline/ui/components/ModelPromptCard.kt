@@ -67,7 +67,7 @@ fun ModelPromptCard(
                     }
                 }
                 is ModelState.Failed -> {
-                    Text(stringResource(R.string.model_failed), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                    Text(modelFailureText(state), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                     Button(onClick = onDownload) { Text(stringResource(R.string.model_retry)) }
                 }
                 else -> {
@@ -77,4 +77,16 @@ fun ModelPromptCard(
             }
         }
     }
+}
+
+/**
+ * Why a download failed, in words the user can act on. A 404/403 is not a connection problem: the files are not
+ * reachable at the download address (for example a private GitHub release), so retrying cannot help.
+ */
+@Composable
+fun modelFailureText(state: ModelState.Failed): String {
+    val m = state.message.orEmpty()
+    val notFound = m.startsWith("HTTP 404") || m.startsWith("HTTP 403") || m.startsWith("HTTP 401")
+    val base = stringResource(if (notFound) R.string.model_failed_not_found else R.string.model_failed)
+    return if (m.isBlank()) base else "$base ($m)"
 }
